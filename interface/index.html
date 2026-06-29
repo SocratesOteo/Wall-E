@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wall-E Workspace</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Wall-E navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">W</div>
+          <div>
+            <strong>Wall-E</strong>
+            <span>Personal coding agent</span>
+          </div>
+        </div>
+
+        <button class="new-thread" type="button">
+          <span aria-hidden="true">+</span>
+          New workspace
+        </button>
+
+        <nav class="nav-list" aria-label="Workspaces">
+          <a class="nav-item active" href="#">
+            <span class="nav-dot build"></span>
+            <span>Build Wall-E interface</span>
+          </a>
+          <a class="nav-item" href="#">
+            <span class="nav-dot review"></span>
+            <span>Repo review</span>
+          </a>
+          <a class="nav-item" href="#">
+            <span class="nav-dot automate"></span>
+            <span>Automation plans</span>
+          </a>
+        </nav>
+
+        <section class="sidebar-section">
+          <h2>Connected</h2>
+          <div class="connection-list">
+            <div class="connection good">
+              <span></span>
+              Brain
+            </div>
+            <div class="connection good">
+              <span></span>
+              TypeScript agent
+            </div>
+            <div class="connection idle">
+              <span></span>
+              Go agent
+            </div>
+          </div>
+        </section>
+
+        <section class="sidebar-section pinned">
+          <h2>Pinned Projects</h2>
+          <button type="button">/Desktop/projects/wall-e</button>
+          <button type="button">Add project</button>
+        </section>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Workspace</p>
+            <h1>Build Wall-E</h1>
+          </div>
+          <div class="topbar-actions">
+            <label class="model-select">
+              <span>Model</span>
+              <select id="modelSelect">
+                <option>openrouter/qwen/qwen3-coder</option>
+                <option>deepseek/deepseek-chat</option>
+                <option>groq/moonshotai/kimi-k2-instruct-0905</option>
+                <option>anthropic/claude-opus-4-8</option>
+              </select>
+            </label>
+            <button class="icon-button" type="button" aria-label="Open settings" title="Settings">
+              <span aria-hidden="true">S</span>
+            </button>
+          </div>
+        </header>
+
+        <section class="workspace-grid">
+          <section class="chat-panel" aria-label="Conversation">
+            <div class="messages" id="messages">
+              <article class="message assistant">
+                <div class="avatar">W</div>
+                <div class="bubble">
+                  <div class="message-meta">Wall-E</div>
+                  <p>I am ready to build, inspect, refactor, test, automate, and commit. Pick a project and give me a task.</p>
+                </div>
+              </article>
+              <article class="message user">
+                <div class="avatar">S</div>
+                <div class="bubble">
+                  <div class="message-meta">You</div>
+                  <p>Build the first interface for Wall-E.</p>
+                </div>
+              </article>
+              <article class="message assistant">
+                <div class="avatar">W</div>
+                <div class="bubble">
+                  <div class="message-meta">Wall-E</div>
+                  <p>I will create a focused coding workspace with chat, project context, file changes, terminal output, and automation controls in one surface.</p>
+                </div>
+              </article>
+            </div>
+
+            <form class="composer" id="composer">
+              <div class="composer-tools" aria-label="Composer tools">
+                <button type="button" title="Attach files" aria-label="Attach files">+</button>
+                <button type="button" title="Toggle plan mode" aria-label="Toggle plan mode">P</button>
+                <button type="button" title="Voice input" aria-label="Voice input">M</button>
+              </div>
+              <textarea id="promptInput" rows="3" placeholder="Ask Wall-E to build, fix, explain, test, or automate..."></textarea>
+              <div class="composer-footer">
+                <label>
+                  <input type="checkbox" checked />
+                  Allow edits
+                </label>
+                <label>
+                  <input type="checkbox" />
+                  Auto-run tests
+                </label>
+                <button class="send-button" type="submit">Send</button>
+              </div>
+            </form>
+          </section>
+
+          <aside class="context-panel" aria-label="Workspace context">
+            <section class="context-block project-card">
+              <div class="section-heading">
+                <h2>Project</h2>
+                <button type="button">Change</button>
+              </div>
+              <div class="project-path">/Users/socrates/Desktop/projects/wall-e</div>
+              <div class="status-row">
+                <span>Branch</span>
+                <strong>main</strong>
+              </div>
+              <div class="status-row">
+                <span>Provider</span>
+                <strong>OpenRouter</strong>
+              </div>
+              <div class="status-row">
+                <span>Mode</span>
+                <strong>Build</strong>
+              </div>
+            </section>
+
+            <section class="context-block">
+              <div class="section-heading">
+                <h2>Plan</h2>
+                <button type="button">Edit</button>
+              </div>
+              <ol class="task-list">
+                <li class="done">Create app interface</li>
+                <li class="active">Wire chat to ADK backend</li>
+                <li>Stream tool calls and diffs</li>
+                <li>Add approvals and automations</li>
+              </ol>
+            </section>
+
+            <section class="context-block">
+              <div class="section-heading">
+                <h2>Automations</h2>
+                <button type="button">New</button>
+              </div>
+              <div class="automation-list">
+                <button type="button">
+                  <span>Daily repo scan</span>
+                  <small>Paused</small>
+                </button>
+                <button type="button">
+                  <span>Dependency monitor</span>
+                  <small>Ready</small>
+                </button>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </main>
+
+      <aside class="activity-panel" aria-label="Activity">
+        <div class="tabs" role="tablist" aria-label="Activity views">
+          <button class="active" type="button">Files</button>
+          <button type="button">Diff</button>
+          <button type="button">Terminal</button>
+        </div>
+
+        <section class="file-tree" aria-label="Files">
+          <div class="file-row selected">interface/index.html</div>
+          <div class="file-row">interface/styles.css</div>
+          <div class="file-row">interface/app.js</div>
+          <div class="file-row">brain/agent.py</div>
+          <div class="file-row">README.md</div>
+        </section>
+
+        <section class="terminal-preview" aria-label="Terminal preview">
+          <div class="terminal-line muted">$ wall-e status</div>
+          <div class="terminal-line ok">brain: ready</div>
+          <div class="terminal-line ok">model: openrouter/qwen/qwen3-coder</div>
+          <div class="terminal-line">workspace: wall-e</div>
+        </section>
+      </aside>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

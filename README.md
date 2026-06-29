@@ -76,6 +76,11 @@ wall-e/
 │   └── go-build-agent/
 │       └── main.go             # parallel builds, file search, disk ops
 │
+├── interface/
+│   ├── index.html              # Wall-E workspace UI
+│   ├── styles.css
+│   └── app.js
+│
 ├── docker-compose.yml
 ├── requirements.txt
 └── .env.example
@@ -118,6 +123,21 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 The sub-agents use Gemini Flash by default (fast and cheap for delegation tasks).
 You can change them in their respective agent files.
+
+---
+
+## Interface
+
+Wall-E includes a first-pass local workspace UI in `interface/`.
+
+Open `interface/index.html` in a browser to try the shell. It currently provides:
+
+- Chat workspace with a composer and model selector
+- Project, branch, provider, and plan panels
+- File, diff, terminal, and automation placeholders
+- Local mock replies while the ADK backend wiring is added
+
+The next step is to connect the composer to the Python ADK brain and stream tool calls, file diffs, terminal output, approvals, and automation events into the right panels.
 
 ---
 
