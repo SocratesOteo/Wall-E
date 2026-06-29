@@ -1,0 +1,4 @@
+# Wall-E brain dependencies
+google-adk[litellm]>=1.0.0    # ADK + LiteLLM provider support
+litellm>=1.40.0                # OpenRouter, DeepSeek, Groq, Together, Anthropic, etc.
+python-dotenv>=1.0.0           # Load .env file

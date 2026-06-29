@@ -1,0 +1,20 @@
+{
+  "name": "wall-e-ts-web-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/agent.ts",
+  "description": "Wall-E TypeScript sub-agent for web and npm tasks",
+  "scripts": {
+    "start": "adk web --port 8001",
+    "dev": "adk web --port 8001",
+    "run:cli": "adk run"
+  },
+  "dependencies": {
+    "@google/adk": "latest"
+  },
+  "devDependencies": {
+    "@google/adk-devtools": "latest",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
