@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for the Wall-E desktop window.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -2,12 +2,60 @@ const messages = document.querySelector("#messages");
 const composer = document.querySelector("#composer");
 const promptInput = document.querySelector("#promptInput");
 const modelSelect = document.querySelector("#modelSelect");
+const projectPath = document.querySelector("#projectPath");
+const providerName = document.querySelector("#providerName");
+const changeProjectButton = document.querySelector("#changeProjectButton");
+const invoke = window.__TAURI__?.core?.invoke;
 
 const state = {
   model: localStorage.getItem("wall-e-model") || modelSelect.value,
+  projectPath: localStorage.getItem("wall-e-project-path") || projectPath.textContent,
 };
 
 modelSelect.value = state.model;
+projectPath.textContent = state.projectPath;
+providerName.textContent = providerFromModel(state.model);
+
+function providerFromModel(model) {
+  const provider = model.split("/")[0] || "local";
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
+async function desktopCommand(command, args) {
+  if (!invoke) return null;
+  return invoke(command, args);
+}
+
+async function loadDesktopState() {
+  try {
+    const settings = await desktopCommand("load_settings");
+    if (!settings) return;
+
+    state.model = settings.model || state.model;
+    state.projectPath = settings.projectPath || state.projectPath;
+    modelSelect.value = state.model;
+    projectPath.textContent = state.projectPath;
+    providerName.textContent = providerFromModel(state.model);
+  } catch (error) {
+    addMessage("assistant", `Native settings could not be loaded: ${error}`);
+  }
+}
+
+async function saveDesktopState() {
+  localStorage.setItem("wall-e-model", state.model);
+  localStorage.setItem("wall-e-project-path", state.projectPath);
+
+  try {
+    await desktopCommand("save_settings", {
+      settings: {
+        model: state.model,
+        projectPath: state.projectPath,
+      },
+    });
+  } catch (error) {
+    addMessage("assistant", `Native settings could not be saved: ${error}`);
+  }
+}
 
 function addMessage(role, text) {
   const article = document.createElement("article");
@@ -66,6 +114,19 @@ composer.addEventListener("submit", (event) => {
 
 modelSelect.addEventListener("change", () => {
   state.model = modelSelect.value;
-  localStorage.setItem("wall-e-model", state.model);
+  providerName.textContent = providerFromModel(state.model);
+  saveDesktopState();
   addMessage("assistant", `Model preference set to ${state.model}.`);
 });
+
+changeProjectButton.addEventListener("click", () => {
+  const nextPath = window.prompt("Project folder path", state.projectPath);
+  if (!nextPath) return;
+
+  state.projectPath = nextPath.trim();
+  projectPath.textContent = state.projectPath;
+  saveDesktopState();
+  addMessage("assistant", `Project set to ${state.projectPath}.`);
+});
+
+loadDesktopState();

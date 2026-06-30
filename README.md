@@ -13,6 +13,9 @@ Wall-E is a multi-agent coding assistant built on Google ADK.
 ### 1. Install prerequisites
 
 ```bash
+# Native desktop app
+cd apps/desktop && npm install
+
 # Python brain
 pip install -r requirements.txt
 
@@ -32,13 +35,19 @@ cp .env.example .env
 
 ### 3. Run Wall-E
 
-**Option A — all in Docker (recommended)**
+**Option A - native desktop app**
+```bash
+cd apps/desktop
+npm run dev
+```
+
+**Option B - all in Docker (recommended)**
 ```bash
 PROJECT_PATH=/path/to/your/project docker compose up
 # Open http://localhost:8000 for the ADK web UI
 ```
 
-**Option B — run manually (3 terminals)**
+**Option C - run manually (3 terminals)**
 ```bash
 # Terminal 1: Go sub-agent
 cd agents/go-build-agent && go run main.go
@@ -80,6 +89,11 @@ wall-e/
 │   ├── index.html              # Wall-E workspace UI
 │   ├── styles.css
 │   └── app.js
+│
+├── apps/
+│   └── desktop/                # Tauri native desktop shell
+│       ├── package.json
+│       └── src-tauri/
 │
 ├── docker-compose.yml
 ├── requirements.txt
@@ -130,7 +144,17 @@ You can change them in their respective agent files.
 
 Wall-E includes a first-pass local workspace UI in `interface/`.
 
-Open `interface/index.html` in a browser to try the shell. It currently provides:
+The preferred path is now the native desktop app:
+
+```bash
+cd apps/desktop
+npm install
+npm run dev
+```
+
+The Tauri app embeds the existing `interface/` renderer and adds native commands for app info and local settings persistence.
+
+You can still open `interface/index.html` in a browser to try the shell without native features. It currently provides:
 
 - Chat workspace with a composer and model selector
 - Project, branch, provider, and plan panels
