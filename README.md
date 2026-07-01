@@ -41,6 +41,12 @@ cd apps/desktop
 npm run dev
 ```
 
+**Package the native app**
+```bash
+cd apps/desktop
+npm run package
+```
+
 **Option B - all in Docker (recommended)**
 ```bash
 PROJECT_PATH=/path/to/your/project docker compose up
@@ -153,6 +159,8 @@ npm run dev
 ```
 
 The Tauri app embeds the existing `interface/` renderer and adds native commands for app info, local settings persistence, and a native folder picker.
+
+Packaging notes live in `docs/PACKAGING.md`.
 
 You can still open `interface/index.html` in a browser to try the shell without native features. It currently provides:
 
