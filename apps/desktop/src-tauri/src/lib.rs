@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 const DEFAULT_MODEL: &str = "openrouter/qwen/qwen3-coder";
 const DEFAULT_PROVIDER: &str = "openrouter";
+const DEFAULT_BRAIN_BASE_URL: &str = "http://127.0.0.1:8765";
 const KEYCHAIN_SERVICE: &str = "Wall-E";
 
 #[derive(Debug, Serialize)]
@@ -20,6 +21,7 @@ struct AppSettings {
     model: String,
     provider: String,
     api_base: Option<String>,
+    brain_base_url: Option<String>,
     project_path: Option<String>,
 }
 
@@ -50,6 +52,7 @@ impl Default for AppSettings {
             model: DEFAULT_MODEL.to_string(),
             provider: DEFAULT_PROVIDER.to_string(),
             api_base: None,
+            brain_base_url: Some(DEFAULT_BRAIN_BASE_URL.to_string()),
             project_path: None,
         }
     }

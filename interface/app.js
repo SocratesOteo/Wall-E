@@ -11,6 +11,7 @@ const settingsForm = document.querySelector("#settingsForm");
 const closeSettingsButton = document.querySelector("#closeSettingsButton");
 const settingsModel = document.querySelector("#settingsModel");
 const settingsApiBase = document.querySelector("#settingsApiBase");
+const settingsBrainBaseUrl = document.querySelector("#settingsBrainBaseUrl");
 const settingsApiKeyField = document.querySelector("#settingsApiKeyField");
 const settingsApiKey = document.querySelector("#settingsApiKey");
 const settingsKeyCallout = document.querySelector("#settingsKeyCallout");
@@ -56,6 +57,8 @@ const state = {
   model: localStorage.getItem("wall-e-model") || modelSelect.value,
   provider: localStorage.getItem("wall-e-provider") || providerFromModel(modelSelect.value),
   apiBase: localStorage.getItem("wall-e-api-base") || "",
+  brainBaseUrl: localStorage.getItem("wall-e-brain-base-url") || "http://127.0.0.1:8765",
+  sessionId: localStorage.getItem("wall-e-session-id") || "",
   keyStatus: null,
   projectPath: localStorage.getItem("wall-e-project-path") || projectPath.textContent,
 };
@@ -91,6 +94,7 @@ function renderProviderState() {
   providerName.textContent = providerLabel(state.provider);
   settingsModel.value = state.model;
   settingsApiBase.value = state.apiBase || preset.apiBase;
+  settingsBrainBaseUrl.value = state.brainBaseUrl;
   settingsApiKeyField.hidden = !preset.keyName;
   settingsApiKey.value = "";
   settingsApiKey.placeholder = hasKey ? "Key saved in OS keychain" : "Paste key to save in OS keychain";
@@ -135,6 +139,7 @@ async function loadDesktopState() {
     state.model = settings.model || state.model;
     state.provider = settings.provider || providerFromModel(state.model);
     state.apiBase = settings.apiBase || "";
+    state.brainBaseUrl = settings.brainBaseUrl || state.brainBaseUrl;
     state.projectPath = settings.projectPath || state.projectPath;
     renderProviderState();
     refreshProviderKeyStatus();
@@ -147,6 +152,7 @@ async function saveDesktopState() {
   localStorage.setItem("wall-e-model", state.model);
   localStorage.setItem("wall-e-provider", state.provider);
   localStorage.setItem("wall-e-api-base", state.apiBase);
+  localStorage.setItem("wall-e-brain-base-url", state.brainBaseUrl);
   localStorage.setItem("wall-e-project-path", state.projectPath);
 
   try {
@@ -155,6 +161,7 @@ async function saveDesktopState() {
         model: state.model,
         provider: state.provider,
         apiBase: state.apiBase || null,
+        brainBaseUrl: state.brainBaseUrl || null,
         projectPath: state.projectPath,
       },
     });
@@ -173,6 +180,152 @@ function useProviderPreset(provider) {
   state.keyStatus = null;
   renderProviderState();
   refreshProviderKeyStatus();
+}
+
+function brainUrl(path) {
+  return `${state.brainBaseUrl.replace(/\/$/, "")}${path}`;
+}
+
+async function brainRequest(path, options = {}) {
+  const response = await fetch(brainUrl(path), {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    const error = new Error(`${response.status} ${response.statusText}${body ? `: ${body}` : ""}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  return response;
+}
+
+async function ensureBrainSession() {
+  if (state.sessionId) return state.sessionId;
+
+  const response = await brainRequest("/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      project_path: state.projectPath,
+      provider: state.provider,
+      model: state.model,
+      api_base: state.apiBase || currentPreset().apiBase,
+    }),
+  });
+  const session = await response.json();
+  state.sessionId = session.id;
+  localStorage.setItem("wall-e-session-id", state.sessionId);
+  return state.sessionId;
+}
+
+function createAssistantMessage() {
+  const article = document.createElement("article");
+  article.className = "message assistant";
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = "W";
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+
+  const meta = document.createElement("div");
+  meta.className = "message-meta";
+  meta.textContent = "Wall-E";
+
+  const paragraph = document.createElement("p");
+  paragraph.textContent = "";
+
+  bubble.append(meta, paragraph);
+  article.append(avatar, bubble);
+  messages.append(article);
+  messages.scrollTop = messages.scrollHeight;
+
+  return {
+    append(text) {
+      paragraph.textContent += text;
+      messages.scrollTop = messages.scrollHeight;
+    },
+    set(text) {
+      paragraph.textContent = text;
+      messages.scrollTop = messages.scrollHeight;
+    },
+  };
+}
+
+async function streamBrainEvents(sessionId, assistantMessage) {
+  const response = await brainRequest(`/sessions/${sessionId}/events`, {
+    headers: { Accept: "application/x-ndjson" },
+  });
+
+  if (!response.body) {
+    throw new Error("Brain API did not return a readable event stream.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      handleBrainEvent(JSON.parse(line), assistantMessage);
+    }
+  }
+
+  if (buffer.trim()) {
+    handleBrainEvent(JSON.parse(buffer), assistantMessage);
+  }
+}
+
+function handleBrainEvent(event, assistantMessage) {
+  if (event.type === "assistant_delta") {
+    assistantMessage.append(event.content || "");
+    return;
+  }
+
+  if (event.type === "status") {
+    assistantMessage.set(event.content || "Working...");
+    return;
+  }
+}
+
+async function sendPromptToBrain(prompt) {
+  const sessionId = await ensureBrainSession();
+  try {
+    await queueBrainMessage(sessionId, prompt);
+  } catch (error) {
+    if (error.status !== 404) throw error;
+    state.sessionId = "";
+    localStorage.removeItem("wall-e-session-id");
+    await queueBrainMessage(await ensureBrainSession(), prompt);
+  }
+
+  const assistantMessage = createAssistantMessage();
+  await streamBrainEvents(state.sessionId, assistantMessage);
+}
+
+async function queueBrainMessage(sessionId, prompt) {
+  await brainRequest(`/sessions/${sessionId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      content: prompt,
+      allow_edits: true,
+      auto_run_tests: false,
+    }),
+  });
 }
 
 async function pickProjectFolder() {
@@ -212,25 +365,7 @@ function addMessage(role, text) {
   messages.scrollTop = messages.scrollHeight;
 }
 
-function draftAssistantReply(prompt) {
-  const lowered = prompt.toLowerCase();
-
-  if (lowered.includes("test") || lowered.includes("bug") || lowered.includes("fix")) {
-    return "I will inspect the relevant files, make the smallest solid change, run the matching tests, and show you the result before we commit.";
-  }
-
-  if (lowered.includes("automate") || lowered.includes("schedule")) {
-    return "I will turn that into a repeatable automation with clear triggers, logs, and an approval point for anything risky.";
-  }
-
-  if (lowered.includes("build") || lowered.includes("create")) {
-    return "I will map the project shape first, then build the feature in place with the interface, backend, and verification steps kept visible.";
-  }
-
-  return "I have captured that request. The next version will stream this to the Wall-E backend and show tool calls, diffs, and terminal output as they happen.";
-}
-
-composer.addEventListener("submit", (event) => {
+composer.addEventListener("submit", async (event) => {
   event.preventDefault();
   const prompt = promptInput.value.trim();
   if (!prompt) return;
@@ -238,9 +373,11 @@ composer.addEventListener("submit", (event) => {
   addMessage("user", prompt);
   promptInput.value = "";
 
-  window.setTimeout(() => {
-    addMessage("assistant", draftAssistantReply(prompt));
-  }, 250);
+  try {
+    await sendPromptToBrain(prompt);
+  } catch (error) {
+    addMessage("assistant", `I could not reach the brain API at ${state.brainBaseUrl}. Start it with: python3 -m brain.server. Details: ${error.message}`);
+  }
 });
 
 modelSelect.addEventListener("change", () => {
@@ -259,6 +396,8 @@ changeProjectButton.addEventListener("click", async () => {
   if (!nextPath) return;
 
   state.projectPath = String(nextPath).trim();
+  state.sessionId = "";
+  localStorage.removeItem("wall-e-session-id");
   projectPath.textContent = state.projectPath;
   saveDesktopState();
   addMessage("assistant", `Project set to ${state.projectPath}.`);
@@ -302,6 +441,9 @@ settingsForm.addEventListener("submit", async (event) => {
   state.model = settingsModel.value.trim();
   state.provider = providerFromModel(state.model) || state.provider;
   state.apiBase = settingsApiBase.value.trim();
+  state.brainBaseUrl = settingsBrainBaseUrl.value.trim() || "http://127.0.0.1:8765";
+  state.sessionId = "";
+  localStorage.removeItem("wall-e-session-id");
   const apiKey = settingsApiKey.value.trim();
   renderProviderState();
   await saveDesktopState();

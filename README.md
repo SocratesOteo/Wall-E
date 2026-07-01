@@ -181,6 +181,8 @@ The local brain API contract lives in `docs/brain-api.md`. Start the first mock 
 python -m brain.server
 ```
 
+Once the server is running, the desktop composer sends messages to the local brain API and renders streamed events. The default brain URL is `http://127.0.0.1:8765` and can be changed in Settings.
+
 ---
 
 ## Extending Wall-E
