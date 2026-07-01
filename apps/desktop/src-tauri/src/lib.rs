@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{AppHandle, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
@@ -129,6 +131,10 @@ fn settings_path() -> Result<PathBuf, String> {
     Ok(settings_dir()?.join("settings.json"))
 }
 
+fn brain_log_path() -> Result<PathBuf, String> {
+    Ok(settings_dir()?.join("brain.log"))
+}
+
 fn provider_key_name(provider: &str) -> Option<&'static str> {
     match provider {
         "openrouter" => Some("OPENROUTER_API_KEY"),
@@ -162,6 +168,55 @@ fn repo_root() -> PathBuf {
         .nth(3)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn brain_python_candidates() -> Vec<String> {
+    let mut candidates = Vec::new();
+
+    if let Ok(python) = std::env::var("WALL_E_PYTHON") {
+        candidates.push(python);
+    }
+
+    candidates.extend(
+        [
+            "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+            "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+            "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+            "/opt/homebrew/bin/python3",
+            "/usr/local/bin/python3",
+            "python3",
+        ]
+        .into_iter()
+        .map(str::to_string),
+    );
+
+    candidates.sort();
+    candidates.dedup();
+    candidates
+}
+
+fn find_brain_python() -> Result<String, String> {
+    let mut failures = Vec::new();
+
+    for candidate in brain_python_candidates() {
+        match Command::new(&candidate)
+            .arg("-c")
+            .arg("import fastapi, uvicorn, google.adk, litellm")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+        {
+            Ok(status) if status.success() => return Ok(candidate),
+            Ok(status) => failures.push(format!("{candidate} exited with {status}")),
+            Err(err) => failures.push(format!("{candidate}: {err}")),
+        }
+    }
+
+    Err(format!(
+        "Could not find a Python with Wall-E brain dependencies. Tried: {}. Install dependencies with the same Python Wall-E uses, or set WALL_E_PYTHON.",
+        failures.join("; ")
+    ))
 }
 
 fn brain_port_from_url(url: &str) -> String {
@@ -391,7 +446,28 @@ fn start_brain(
         }
 
         let settings = read_settings()?;
-        let mut command = Command::new("python3");
+        let python = find_brain_python()?;
+        let log_path = brain_log_path()?;
+        let mut log_file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+            .map_err(|err| format!("Could not open brain log at {}: {err}", log_path.display()))?;
+        let stdout = log_file
+            .try_clone()
+            .map_err(|err| format!("Could not prepare brain stdout log: {err}"))?;
+        let stderr = log_file
+            .try_clone()
+            .map_err(|err| format!("Could not prepare brain stderr log: {err}"))?;
+
+        writeln!(
+            log_file,
+            "\nStarting Wall-E brain with {python}, model {}, api base {:?}",
+            settings.model, settings.api_base
+        )
+        .map_err(|err| format!("Could not write brain log header: {err}"))?;
+
+        let mut command = Command::new(&python);
         command
             .arg("-m")
             .arg("brain.server")
@@ -401,8 +477,8 @@ fn start_brain(
             .env("WALL_E_PROVIDER", &settings.provider)
             .env("WALL_E_MODEL", &settings.model)
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stdout(Stdio::from(stdout))
+            .stderr(Stdio::from(stderr));
 
         if let Some(api_base) = settings
             .api_base
@@ -424,9 +500,20 @@ fn start_brain(
             }
         }
 
-        let child = command
+        let mut child = command
             .spawn()
             .map_err(|err| format!("Could not start Wall-E brain process: {err}"))?;
+
+        std::thread::sleep(Duration::from_millis(250));
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|err| format!("Could not check Wall-E brain startup: {err}"))?
+        {
+            return Err(format!(
+                "Wall-E brain exited during startup with {status}. See {} for details.",
+                log_path.display()
+            ));
+        }
 
         *child_guard = Some(child);
     }
