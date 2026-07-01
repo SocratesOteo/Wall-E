@@ -61,7 +61,10 @@ cd agents/go-build-agent && go run main.go
 # Terminal 2: TypeScript sub-agent
 cd agents/ts-web-agent && npm start
 
-# Terminal 3: Wall-E brain (chat via web UI)
+# Terminal 3: Wall-E brain API
+python -m brain.server
+
+# Or Wall-E brain via ADK web UI
 cd brain && WALL_E_PROJECT_ROOT=/your/project adk web --port 8000
 
 # Or chat via CLI
@@ -171,6 +174,12 @@ You can still open `interface/index.html` in a browser to try the shell without 
 - Local mock replies while the ADK backend wiring is added
 
 The next step is to connect the composer to the Python ADK brain and stream tool calls, file diffs, terminal output, approvals, and automation events into the right panels.
+
+The local brain API contract lives in `docs/brain-api.md`. Start the first mock streaming API with:
+
+```bash
+python -m brain.server
+```
 
 ---
 

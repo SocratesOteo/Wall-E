@@ -186,11 +186,11 @@ Acceptance:
 2. Move the existing `interface/` shell into the Tauri renderer. Done by embedding `interface/` as the desktop frontend.
 3. Add local settings persistence for model and project path. Done with native settings commands and `~/.wall-e/settings.json`.
 4. Add a native project picker. Done with Tauri's dialog plugin.
-5. Define the local brain API contract in `docs/brain-api.md`.
+5. Define the local brain API contract in `docs/brain-api.md`. Done.
 6. Add provider settings for Ollama, OpenRouter, DeepSeek, and Groq. Done.
 7. Add safe API key storage through the OS keychain. Done.
-8. Add a minimal Python API wrapper around the ADK brain.
-9. Stream mock events from the brain wrapper into the desktop app.
+8. Add a minimal Python API wrapper around the ADK brain. Started with `brain/server.py`.
+9. Stream mock events from the brain wrapper into the desktop app. API side done.
 10. Replace mock events with real Wall-E agent events.
 
 ## Open Decisions
