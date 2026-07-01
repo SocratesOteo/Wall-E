@@ -9,57 +9,72 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Wall-E navigation">
-        <div class="brand">
-          <div class="brand-mark" aria-hidden="true">W</div>
-          <div>
-            <strong>Wall-E</strong>
-            <span>Personal coding agent</span>
+        <div class="sidebar-main">
+          <div class="brand">
+            <div class="brand-mark" aria-hidden="true">W</div>
+            <div>
+              <strong>Wall-E</strong>
+              <span>Personal coding agent</span>
+            </div>
           </div>
+
+          <button class="new-thread" type="button">
+            <span aria-hidden="true">+</span>
+            New workspace
+          </button>
+
+          <nav class="nav-list" aria-label="Workspaces">
+            <a class="nav-item active" href="#">
+              <span class="nav-dot build"></span>
+              <span>Build Wall-E interface</span>
+            </a>
+            <a class="nav-item" href="#">
+              <span class="nav-dot review"></span>
+              <span>Repo review</span>
+            </a>
+            <a class="nav-item" href="#">
+              <span class="nav-dot automate"></span>
+              <span>Automation plans</span>
+            </a>
+          </nav>
+
+          <section class="sidebar-section">
+            <h2>Connected</h2>
+            <div class="connection-list">
+              <div class="connection good">
+                <span></span>
+                Brain
+              </div>
+              <div class="connection good">
+                <span></span>
+                TypeScript agent
+              </div>
+              <div class="connection idle">
+                <span></span>
+                Go agent
+              </div>
+            </div>
+          </section>
+
+          <section class="sidebar-section pinned">
+            <h2>Pinned Projects</h2>
+            <button type="button">/Desktop/projects/wall-e</button>
+            <button type="button">Add project</button>
+          </section>
         </div>
 
-        <button class="new-thread" type="button">
-          <span aria-hidden="true">+</span>
-          New workspace
-        </button>
-
-        <nav class="nav-list" aria-label="Workspaces">
-          <a class="nav-item active" href="#">
-            <span class="nav-dot build"></span>
-            <span>Build Wall-E interface</span>
-          </a>
-          <a class="nav-item" href="#">
-            <span class="nav-dot review"></span>
-            <span>Repo review</span>
-          </a>
-          <a class="nav-item" href="#">
-            <span class="nav-dot automate"></span>
-            <span>Automation plans</span>
-          </a>
-        </nav>
-
-        <section class="sidebar-section">
-          <h2>Connected</h2>
-          <div class="connection-list">
-            <div class="connection good">
-              <span></span>
-              Brain
-            </div>
-            <div class="connection good">
-              <span></span>
-              TypeScript agent
-            </div>
-            <div class="connection idle">
-              <span></span>
-              Go agent
-            </div>
-          </div>
-        </section>
-
-        <section class="sidebar-section pinned">
-          <h2>Pinned Projects</h2>
-          <button type="button">/Desktop/projects/wall-e</button>
-          <button type="button">Add project</button>
-        </section>
+        <footer class="sidebar-footer" aria-label="Account and app settings">
+          <button class="profile-button" id="profileButton" type="button">
+            <span class="profile-avatar" id="profileAvatar">S</span>
+            <span>
+              <strong id="profileName">Socrates</strong>
+              <small>Local profile</small>
+            </span>
+          </button>
+          <button class="sidebar-settings-button" id="settingsButton" type="button" aria-label="Open app settings">
+            Settings
+          </button>
+        </footer>
       </aside>
 
       <main class="main">
@@ -78,9 +93,6 @@
                 <option>anthropic/claude-opus-4-8</option>
               </select>
             </label>
-            <button class="settings-button" id="settingsButton" type="button" aria-label="Open settings and updates">
-              Settings & Updates
-            </button>
           </div>
         </header>
 
@@ -213,56 +225,96 @@
       <form class="settings-card" id="settingsForm" method="dialog">
         <header class="settings-header">
           <div>
-            <p class="eyebrow">Provider Settings</p>
-            <h2>Model Connection</h2>
+            <p class="eyebrow">Wall-E Settings</p>
+            <h2>Profile, App, And Model</h2>
           </div>
           <button class="icon-button" id="closeSettingsButton" type="button" aria-label="Close settings">X</button>
         </header>
 
-        <div class="provider-grid" role="radiogroup" aria-label="Model providers">
-          <button class="provider-option active" type="button" data-provider="ollama">
-            <strong>Ollama</strong>
-            <span>No key, local</span>
-          </button>
-          <button class="provider-option" type="button" data-provider="openrouter">
-            <strong>OpenRouter</strong>
-            <span>One key, many models</span>
-          </button>
-          <button class="provider-option" type="button" data-provider="deepseek">
-            <strong>DeepSeek</strong>
-            <span>Cheap hosted</span>
-          </button>
-          <button class="provider-option" type="button" data-provider="groq">
-            <strong>Groq</strong>
-            <span>Fast hosted</span>
-          </button>
-        </div>
+        <section class="settings-section">
+          <div class="settings-section-heading">
+            <h3>Profile</h3>
+            <p>Local identity used in the workspace.</p>
+          </div>
+          <div class="settings-row">
+            <label class="settings-field">
+              <span>Name</span>
+              <input id="settingsProfileName" name="profileName" autocomplete="name" />
+            </label>
+            <label class="settings-field initials-field">
+              <span>Initials</span>
+              <input id="settingsProfileInitials" name="profileInitials" maxlength="2" autocomplete="off" />
+            </label>
+          </div>
+        </section>
 
-        <label class="settings-field">
-          <span>Model</span>
-          <input id="settingsModel" name="model" autocomplete="off" />
-        </label>
+        <section class="settings-section">
+          <div class="settings-section-heading">
+            <h3>App</h3>
+            <p>Workspace, local brain, and installed build.</p>
+          </div>
+          <label class="settings-field">
+            <span>Project folder</span>
+            <input id="settingsProjectPath" name="projectPath" autocomplete="off" readonly />
+          </label>
+          <label class="settings-field">
+            <span>Brain API URL</span>
+            <input id="settingsBrainBaseUrl" name="brainBaseUrl" autocomplete="off" />
+          </label>
+          <div class="key-callout" id="appInfoCallout"></div>
+          <div class="key-callout" id="brainStatusCallout"></div>
+        </section>
 
-        <label class="settings-field">
-          <span>Base URL</span>
-          <input id="settingsApiBase" name="apiBase" autocomplete="off" />
-        </label>
+        <section class="settings-section">
+          <div class="settings-section-heading">
+            <h3>Provider</h3>
+            <p>Model routing and hosted provider keys.</p>
+          </div>
+          <div class="provider-grid" role="radiogroup" aria-label="Model providers">
+            <button class="provider-option active" type="button" data-provider="ollama">
+              <strong>Ollama</strong>
+              <span>No key, local</span>
+            </button>
+            <button class="provider-option" type="button" data-provider="openrouter">
+              <strong>OpenRouter</strong>
+              <span>One key, many models</span>
+            </button>
+            <button class="provider-option" type="button" data-provider="deepseek">
+              <strong>DeepSeek</strong>
+              <span>Cheap hosted</span>
+            </button>
+            <button class="provider-option" type="button" data-provider="groq">
+              <strong>Groq</strong>
+              <span>Fast hosted</span>
+            </button>
+          </div>
 
-        <label class="settings-field">
-          <span>Brain API URL</span>
-          <input id="settingsBrainBaseUrl" name="brainBaseUrl" autocomplete="off" />
-        </label>
+          <label class="settings-field">
+            <span>Model</span>
+            <input id="settingsModel" name="model" autocomplete="off" />
+          </label>
 
-        <div class="key-callout" id="brainStatusCallout"></div>
-        <div class="key-callout" id="updateStatusCallout"></div>
+          <label class="settings-field">
+            <span>Base URL</span>
+            <input id="settingsApiBase" name="apiBase" autocomplete="off" />
+          </label>
 
-        <label class="settings-field" id="settingsApiKeyField">
-          <span>API key</span>
-          <input id="settingsApiKey" name="apiKey" type="password" autocomplete="off" placeholder="Stored in OS keychain" />
-        </label>
+          <label class="settings-field" id="settingsApiKeyField">
+            <span>API key</span>
+            <input id="settingsApiKey" name="apiKey" type="password" autocomplete="off" placeholder="Stored in OS keychain" />
+          </label>
 
-        <div class="key-callout" id="settingsKeyCallout"></div>
-        <p class="settings-note" id="settingsNote"></p>
+          <div class="key-callout" id="settingsKeyCallout"></div>
+          <p class="settings-note" id="settingsNote"></p>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-heading">
+            <h3>Updates</h3>
+            <p>Signed desktop updates from GitHub Releases.</p>
+          </div>
+          <div class="key-callout" id="updateStatusCallout"></div>
+        </section>
 
         <footer class="settings-actions">
           <button type="button" id="resetProviderButton">Use Preset</button>

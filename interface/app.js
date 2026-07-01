@@ -5,15 +5,22 @@ const modelSelect = document.querySelector("#modelSelect");
 const projectPath = document.querySelector("#projectPath");
 const providerName = document.querySelector("#providerName");
 const changeProjectButton = document.querySelector("#changeProjectButton");
+const profileButton = document.querySelector("#profileButton");
+const profileAvatar = document.querySelector("#profileAvatar");
+const profileName = document.querySelector("#profileName");
 const settingsButton = document.querySelector("#settingsButton");
 const settingsDialog = document.querySelector("#settingsDialog");
 const settingsForm = document.querySelector("#settingsForm");
 const closeSettingsButton = document.querySelector("#closeSettingsButton");
+const settingsProfileName = document.querySelector("#settingsProfileName");
+const settingsProfileInitials = document.querySelector("#settingsProfileInitials");
+const settingsProjectPath = document.querySelector("#settingsProjectPath");
 const settingsModel = document.querySelector("#settingsModel");
 const settingsApiBase = document.querySelector("#settingsApiBase");
 const settingsBrainBaseUrl = document.querySelector("#settingsBrainBaseUrl");
 const settingsApiKeyField = document.querySelector("#settingsApiKeyField");
 const settingsApiKey = document.querySelector("#settingsApiKey");
+const appInfoCallout = document.querySelector("#appInfoCallout");
 const brainStatusCallout = document.querySelector("#brainStatusCallout");
 const updateStatusCallout = document.querySelector("#updateStatusCallout");
 const settingsKeyCallout = document.querySelector("#settingsKeyCallout");
@@ -61,6 +68,9 @@ const providerPresets = {
 };
 
 const state = {
+  appInfo: null,
+  profileName: localStorage.getItem("wall-e-profile-name") || "Socrates",
+  profileInitials: localStorage.getItem("wall-e-profile-initials") || "S",
   model: localStorage.getItem("wall-e-model") || modelSelect.value,
   provider: localStorage.getItem("wall-e-provider") || providerFromModel(modelSelect.value),
   apiBase: localStorage.getItem("wall-e-api-base") || "",
@@ -99,8 +109,10 @@ function renderProviderState() {
   const preset = currentPreset();
   const hasKey = Boolean(state.keyStatus?.hasKey);
   refreshModelOptions();
+  renderProfileState();
   projectPath.textContent = state.projectPath;
   providerName.textContent = providerLabel(state.provider);
+  settingsProjectPath.value = state.projectPath;
   settingsModel.value = state.model;
   settingsApiBase.value = state.apiBase || preset.apiBase;
   settingsBrainBaseUrl.value = state.brainBaseUrl;
@@ -115,6 +127,23 @@ function renderProviderState() {
   providerOptions.forEach((option) => {
     option.classList.toggle("active", option.dataset.provider === state.provider);
   });
+}
+
+function renderProfileState() {
+  const initials = (state.profileInitials || state.profileName.slice(0, 1) || "S").trim().slice(0, 2).toUpperCase();
+  profileName.textContent = state.profileName || "Socrates";
+  profileAvatar.textContent = initials;
+  settingsProfileName.value = state.profileName;
+  settingsProfileInitials.value = initials;
+}
+
+function renderAppInfo() {
+  if (!state.appInfo) {
+    appInfoCallout.textContent = "Wall-E app info will appear here in the native desktop app.";
+    return;
+  }
+
+  appInfoCallout.textContent = `${state.appInfo.name} ${state.appInfo.version} · Settings stored at ${state.appInfo.settingsPath}`;
 }
 
 async function refreshProviderKeyStatus() {
@@ -231,7 +260,9 @@ async function ensureBrainRunning() {
 
 async function loadDesktopState() {
   try {
+    state.appInfo = await desktopCommand("get_app_info");
     const settings = await desktopCommand("load_settings");
+    renderAppInfo();
     if (!settings) return;
 
     state.model = settings.model || state.model;
@@ -248,6 +279,8 @@ async function loadDesktopState() {
 }
 
 async function saveDesktopState() {
+  localStorage.setItem("wall-e-profile-name", state.profileName);
+  localStorage.setItem("wall-e-profile-initials", state.profileInitials);
   localStorage.setItem("wall-e-model", state.model);
   localStorage.setItem("wall-e-provider", state.provider);
   localStorage.setItem("wall-e-api-base", state.apiBase);
@@ -266,6 +299,19 @@ async function saveDesktopState() {
     });
   } catch (error) {
     addMessage("assistant", `Native settings could not be saved: ${error}`);
+  }
+}
+
+function openSettings(focusTarget) {
+  renderProviderState();
+  renderProfileState();
+  renderAppInfo();
+  refreshProviderKeyStatus();
+  refreshBrainStatus();
+  renderUpdateStatus();
+  settingsDialog.showModal();
+  if (focusTarget) {
+    requestAnimationFrame(() => focusTarget.focus());
   }
 }
 
@@ -518,12 +564,12 @@ changeProjectButton.addEventListener("click", async () => {
   addMessage("assistant", `Project set to ${state.projectPath}.`);
 });
 
+profileButton.addEventListener("click", () => {
+  openSettings(settingsProfileName);
+});
+
 settingsButton.addEventListener("click", () => {
-  renderProviderState();
-  refreshProviderKeyStatus();
-  refreshBrainStatus();
-  renderUpdateStatus();
-  settingsDialog.showModal();
+  openSettings();
 });
 
 closeSettingsButton.addEventListener("click", () => {
@@ -618,6 +664,10 @@ deleteProviderKeyButton.addEventListener("click", async () => {
 settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const previousBrainBaseUrl = state.brainBaseUrl;
+  state.profileName = settingsProfileName.value.trim() || "Socrates";
+  state.profileInitials = (settingsProfileInitials.value.trim() || state.profileName.slice(0, 1) || "S")
+    .slice(0, 2)
+    .toUpperCase();
   state.model = settingsModel.value.trim();
   state.provider = providerFromModel(state.model) || state.provider;
   state.apiBase = settingsApiBase.value.trim();
@@ -657,6 +707,8 @@ settingsForm.addEventListener("submit", async (event) => {
 });
 
 renderProviderState();
+renderProfileState();
+renderAppInfo();
 renderBrainStatus();
 renderUpdateStatus();
 loadDesktopState();
