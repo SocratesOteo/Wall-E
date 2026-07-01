@@ -253,6 +253,8 @@
           <input id="settingsBrainBaseUrl" name="brainBaseUrl" autocomplete="off" />
         </label>
 
+        <div class="key-callout" id="brainStatusCallout"></div>
+
         <label class="settings-field" id="settingsApiKeyField">
           <span>API key</span>
           <input id="settingsApiKey" name="apiKey" type="password" autocomplete="off" placeholder="Stored in OS keychain" />
@@ -263,6 +265,8 @@
 
         <footer class="settings-actions">
           <button type="button" id="resetProviderButton">Use Preset</button>
+          <button type="button" id="startBrainButton">Start Brain</button>
+          <button type="button" id="stopBrainButton">Stop Brain</button>
           <button type="button" id="deleteProviderKeyButton">Delete Key</button>
           <button class="send-button" type="submit">Save</button>
         </footer>

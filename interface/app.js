@@ -14,9 +14,12 @@ const settingsApiBase = document.querySelector("#settingsApiBase");
 const settingsBrainBaseUrl = document.querySelector("#settingsBrainBaseUrl");
 const settingsApiKeyField = document.querySelector("#settingsApiKeyField");
 const settingsApiKey = document.querySelector("#settingsApiKey");
+const brainStatusCallout = document.querySelector("#brainStatusCallout");
 const settingsKeyCallout = document.querySelector("#settingsKeyCallout");
 const settingsNote = document.querySelector("#settingsNote");
 const resetProviderButton = document.querySelector("#resetProviderButton");
+const startBrainButton = document.querySelector("#startBrainButton");
+const stopBrainButton = document.querySelector("#stopBrainButton");
 const deleteProviderKeyButton = document.querySelector("#deleteProviderKeyButton");
 const providerOptions = Array.from(document.querySelectorAll(".provider-option"));
 const invoke = window.__TAURI__?.core?.invoke;
@@ -59,6 +62,7 @@ const state = {
   apiBase: localStorage.getItem("wall-e-api-base") || "",
   brainBaseUrl: localStorage.getItem("wall-e-brain-base-url") || "http://127.0.0.1:8765",
   sessionId: localStorage.getItem("wall-e-session-id") || "",
+  brainStatus: null,
   keyStatus: null,
   projectPath: localStorage.getItem("wall-e-project-path") || projectPath.textContent,
 };
@@ -131,6 +135,69 @@ async function desktopCommand(command, args) {
   return invoke(command, args);
 }
 
+function renderBrainStatus() {
+  const status = state.brainStatus;
+  const isNative = Boolean(invoke);
+
+  if (!isNative) {
+    brainStatusCallout.textContent = "Native brain controls are available in the desktop app. In browser mode, start the brain with: python3 -m brain.server.";
+    startBrainButton.hidden = true;
+    stopBrainButton.hidden = true;
+    return;
+  }
+
+  if (!status) {
+    brainStatusCallout.textContent = "Brain process status has not been checked yet.";
+    startBrainButton.hidden = false;
+    stopBrainButton.hidden = true;
+    return;
+  }
+
+  brainStatusCallout.textContent = status.running
+    ? `Brain running at ${status.url}${status.pid ? ` with PID ${status.pid}` : ""}.`
+    : `Brain stopped. It will run at ${state.brainBaseUrl}.`;
+  startBrainButton.hidden = status.running;
+  stopBrainButton.hidden = !status.running;
+}
+
+async function refreshBrainStatus() {
+  try {
+    const status = await desktopCommand("get_brain_status");
+    state.brainStatus = status;
+  } catch (error) {
+    state.brainStatus = { running: false, pid: null, url: state.brainBaseUrl, message: String(error) };
+    addMessage("assistant", `Brain process status could not be checked: ${error}`);
+  }
+  renderBrainStatus();
+}
+
+async function waitForBrainHealth() {
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      await brainRequest("/health");
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
+  throw lastError || new Error("Brain API did not become healthy.");
+}
+
+async function ensureBrainRunning() {
+  if (!invoke) return;
+
+  const status = await desktopCommand("start_brain", {
+    request: { brainBaseUrl: state.brainBaseUrl },
+  });
+  state.brainStatus = status;
+  renderBrainStatus();
+  await waitForBrainHealth();
+}
+
 async function loadDesktopState() {
   try {
     const settings = await desktopCommand("load_settings");
@@ -142,6 +209,7 @@ async function loadDesktopState() {
     state.brainBaseUrl = settings.brainBaseUrl || state.brainBaseUrl;
     state.projectPath = settings.projectPath || state.projectPath;
     renderProviderState();
+    renderBrainStatus();
     refreshProviderKeyStatus();
   } catch (error) {
     addMessage("assistant", `Native settings could not be loaded: ${error}`);
@@ -303,6 +371,7 @@ function handleBrainEvent(event, assistantMessage) {
 }
 
 async function sendPromptToBrain(prompt) {
+  await ensureBrainRunning();
   const sessionId = await ensureBrainSession();
   try {
     await queueBrainMessage(sessionId, prompt);
@@ -376,7 +445,7 @@ composer.addEventListener("submit", async (event) => {
   try {
     await sendPromptToBrain(prompt);
   } catch (error) {
-    addMessage("assistant", `I could not reach the brain API at ${state.brainBaseUrl}. Start it with: python3 -m brain.server. Details: ${error.message}`);
+    addMessage("assistant", `I could not reach the brain API at ${state.brainBaseUrl}. ${invoke ? "Try Start Brain in Settings." : "Start it with: python3 -m brain.server."} Details: ${error.message}`);
   }
 });
 
@@ -406,6 +475,7 @@ changeProjectButton.addEventListener("click", async () => {
 settingsButton.addEventListener("click", () => {
   renderProviderState();
   refreshProviderKeyStatus();
+  refreshBrainStatus();
   settingsDialog.showModal();
 });
 
@@ -423,6 +493,34 @@ resetProviderButton.addEventListener("click", () => {
   useProviderPreset(state.provider);
 });
 
+startBrainButton.addEventListener("click", async () => {
+  try {
+    state.brainBaseUrl = settingsBrainBaseUrl.value.trim() || "http://127.0.0.1:8765";
+    const status = await desktopCommand("start_brain", {
+      request: { brainBaseUrl: state.brainBaseUrl },
+    });
+    state.brainStatus = status;
+    renderBrainStatus();
+    await waitForBrainHealth();
+    addMessage("assistant", `Brain started at ${state.brainBaseUrl}.`);
+  } catch (error) {
+    addMessage("assistant", `Brain could not be started: ${error}`);
+  }
+});
+
+stopBrainButton.addEventListener("click", async () => {
+  try {
+    const status = await desktopCommand("stop_brain");
+    state.brainStatus = status;
+    state.sessionId = "";
+    localStorage.removeItem("wall-e-session-id");
+    renderBrainStatus();
+    addMessage("assistant", "Brain stopped.");
+  } catch (error) {
+    addMessage("assistant", `Brain could not be stopped: ${error}`);
+  }
+});
+
 deleteProviderKeyButton.addEventListener("click", async () => {
   try {
     const status = await desktopCommand("delete_provider_key", {
@@ -438,12 +536,15 @@ deleteProviderKeyButton.addEventListener("click", async () => {
 
 settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const previousBrainBaseUrl = state.brainBaseUrl;
   state.model = settingsModel.value.trim();
   state.provider = providerFromModel(state.model) || state.provider;
   state.apiBase = settingsApiBase.value.trim();
   state.brainBaseUrl = settingsBrainBaseUrl.value.trim() || "http://127.0.0.1:8765";
-  state.sessionId = "";
-  localStorage.removeItem("wall-e-session-id");
+  if (state.brainBaseUrl !== previousBrainBaseUrl) {
+    state.sessionId = "";
+    localStorage.removeItem("wall-e-session-id");
+  }
   const apiKey = settingsApiKey.value.trim();
   renderProviderState();
   await saveDesktopState();
@@ -475,4 +576,5 @@ settingsForm.addEventListener("submit", async (event) => {
 });
 
 renderProviderState();
+renderBrainStatus();
 loadDesktopState();

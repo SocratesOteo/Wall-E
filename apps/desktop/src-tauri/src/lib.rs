@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
+use tauri::State;
 
 const DEFAULT_MODEL: &str = "openrouter/qwen/qwen3-coder";
 const DEFAULT_PROVIDER: &str = "openrouter";
@@ -33,6 +36,15 @@ struct KeyStatus {
     key_name: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BrainStatus {
+    running: bool,
+    pid: Option<u32>,
+    url: String,
+    message: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SaveProviderKeyRequest {
@@ -46,6 +58,17 @@ struct ProviderKeyRequest {
     provider: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StartBrainRequest {
+    brain_base_url: Option<String>,
+}
+
+struct BrainProcessState {
+    child: Mutex<Option<Child>>,
+    url: Mutex<String>,
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -54,6 +77,26 @@ impl Default for AppSettings {
             api_base: None,
             brain_base_url: Some(DEFAULT_BRAIN_BASE_URL.to_string()),
             project_path: None,
+        }
+    }
+}
+
+impl Default for BrainProcessState {
+    fn default() -> Self {
+        Self {
+            child: Mutex::new(None),
+            url: Mutex::new(DEFAULT_BRAIN_BASE_URL.to_string()),
+        }
+    }
+}
+
+impl Drop for BrainProcessState {
+    fn drop(&mut self) {
+        if let Ok(child_slot) = self.child.get_mut() {
+            if let Some(mut child) = child_slot.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
         }
     }
 }
@@ -94,6 +137,72 @@ fn read_settings() -> Result<AppSettings, String> {
         .map_err(|err| format!("Could not read settings from {}: {err}", path.display()))?;
     serde_json::from_str(&raw)
         .map_err(|err| format!("Could not parse settings from {}: {err}", path.display()))
+}
+
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(3)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn brain_port_from_url(url: &str) -> String {
+    let without_path = url
+        .trim()
+        .trim_end_matches('/')
+        .split('/')
+        .next_back()
+        .unwrap_or(DEFAULT_BRAIN_BASE_URL);
+
+    without_path
+        .rsplit(':')
+        .next()
+        .filter(|port| !port.is_empty() && port.chars().all(|char| char.is_ascii_digit()))
+        .unwrap_or("8765")
+        .to_string()
+}
+
+fn current_brain_status(
+    state: &State<'_, BrainProcessState>,
+    message: impl Into<String>,
+) -> Result<BrainStatus, String> {
+    let url = state
+        .url
+        .lock()
+        .map_err(|_| "Brain process URL lock was poisoned.".to_string())?
+        .clone();
+
+    let mut child_guard = state
+        .child
+        .lock()
+        .map_err(|_| "Brain process lock was poisoned.".to_string())?;
+
+    let mut running = false;
+    let mut pid = None;
+
+    if let Some(child) = child_guard.as_mut() {
+        match child.try_wait() {
+            Ok(Some(_status)) => {
+                *child_guard = None;
+            }
+            Ok(None) => {
+                running = true;
+                pid = Some(child.id());
+            }
+            Err(err) => {
+                *child_guard = None;
+                return Err(format!("Could not check brain process status: {err}"));
+            }
+        }
+    }
+
+    Ok(BrainStatus {
+        running,
+        pid,
+        url,
+        message: message.into(),
+    })
 }
 
 fn write_settings(settings: &AppSettings) -> Result<(), String> {
@@ -218,17 +327,112 @@ fn delete_provider_key(request: ProviderKeyRequest) -> Result<KeyStatus, String>
     get_provider_key_status(request.provider)
 }
 
+#[tauri::command]
+fn get_brain_status(state: State<'_, BrainProcessState>) -> Result<BrainStatus, String> {
+    current_brain_status(&state, "Brain process status checked.")
+}
+
+#[tauri::command]
+fn start_brain(
+    state: State<'_, BrainProcessState>,
+    request: StartBrainRequest,
+) -> Result<BrainStatus, String> {
+    let url = request
+        .brain_base_url
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_BRAIN_BASE_URL.to_string());
+    let port = brain_port_from_url(&url);
+
+    {
+        let mut url_guard = state
+            .url
+            .lock()
+            .map_err(|_| "Brain process URL lock was poisoned.".to_string())?;
+        *url_guard = url;
+    }
+
+    {
+        let mut child_guard = state
+            .child
+            .lock()
+            .map_err(|_| "Brain process lock was poisoned.".to_string())?;
+
+        if let Some(child) = child_guard.as_mut() {
+            match child.try_wait() {
+                Ok(Some(_status)) => {
+                    *child_guard = None;
+                }
+                Ok(None) => {
+                    drop(child_guard);
+                    return current_brain_status(&state, "Brain is already running.");
+                }
+                Err(err) => {
+                    *child_guard = None;
+                    return Err(format!("Could not check existing brain process: {err}"));
+                }
+            }
+        }
+
+        let child = Command::new("python3")
+            .arg("-m")
+            .arg("brain.server")
+            .current_dir(repo_root())
+            .env("WALL_E_BRAIN_HOST", "127.0.0.1")
+            .env("WALL_E_BRAIN_PORT", port)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|err| format!("Could not start Wall-E brain process: {err}"))?;
+
+        *child_guard = Some(child);
+    }
+
+    current_brain_status(&state, "Brain process started.")
+}
+
+#[tauri::command]
+fn stop_brain(state: State<'_, BrainProcessState>) -> Result<BrainStatus, String> {
+    {
+        let mut child_guard = state
+            .child
+            .lock()
+            .map_err(|_| "Brain process lock was poisoned.".to_string())?;
+
+        if let Some(mut child) = child_guard.take() {
+            if child
+                .try_wait()
+                .map_err(|err| format!("Could not check Wall-E brain process before stop: {err}"))?
+                .is_none()
+            {
+                child
+                    .kill()
+                    .map_err(|err| format!("Could not stop Wall-E brain process: {err}"))?;
+            }
+            child
+                .wait()
+                .map_err(|err| format!("Could not finish stopping Wall-E brain process: {err}"))?;
+        }
+    }
+
+    current_brain_status(&state, "Brain process stopped.")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(BrainProcessState::default())
         .invoke_handler(tauri::generate_handler![
             get_app_info,
             load_settings,
             save_settings,
             get_provider_key_status,
             save_provider_key,
-            delete_provider_key
+            delete_provider_key,
+            get_brain_status,
+            start_brain,
+            stop_brain
         ])
         .run(tauri::generate_context!())
         .expect("error while running Wall-E desktop application");

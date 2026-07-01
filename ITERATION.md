@@ -191,12 +191,13 @@ Acceptance:
 7. Add safe API key storage through the OS keychain. Done.
 8. Add a minimal Python API wrapper around the ADK brain. Started with `brain/server.py`.
 9. Stream mock events from the brain wrapper into the desktop app. Done.
-10. Replace mock events with real Wall-E agent events.
+10. Let the desktop app start and stop the local Python brain process. Done.
+11. Replace mock events with real Wall-E agent events.
 
 ## Open Decisions
 
 - Tauri vs Electron final choice.
-- Whether the brain should run embedded, as a child process, or as a local service.
+- Whether the brain should stay as a desktop-managed child process long term or move to a local service.
 - Whether session storage should start with SQLite or plain JSON files.
 - How strict default approvals should be.
 - Whether automations can run while the UI is closed.

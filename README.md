@@ -163,6 +163,7 @@ npm run dev
 
 The Tauri app embeds the existing `interface/` renderer and adds native commands for app info, local settings persistence, and a native folder picker.
 The settings panel includes provider presets for Ollama, OpenRouter, DeepSeek, and Groq. Ollama runs locally without an API key; hosted provider keys are stored through the OS keychain.
+The desktop app can also start and stop the local Python brain process for you, so the composer can connect without a separate brain terminal.
 
 Packaging notes live in `docs/PACKAGING.md`.
 
@@ -181,7 +182,7 @@ The local brain API contract lives in `docs/brain-api.md`. Start the first mock 
 python -m brain.server
 ```
 
-Once the server is running, the desktop composer sends messages to the local brain API and renders streamed events. The default brain URL is `http://127.0.0.1:8765` and can be changed in Settings.
+Once the server is running, the desktop composer sends messages to the local brain API and renders streamed events. In the native app, Wall-E starts the local brain automatically before sending a message. The default brain URL is `http://127.0.0.1:8765` and can be changed in Settings.
 
 ---
 
