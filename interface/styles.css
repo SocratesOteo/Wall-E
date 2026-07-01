@@ -203,6 +203,7 @@ small {
 .automation-list button,
 .tabs button,
 .composer-tools button,
+.settings-button,
 .icon-button {
   border: 1px solid var(--line);
   background: transparent;
@@ -275,6 +276,19 @@ h1 {
 .icon-button {
   width: 42px;
   height: 42px;
+}
+
+.settings-button {
+  min-height: 42px;
+  padding: 0 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.settings-button:hover,
+.icon-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .workspace-grid {

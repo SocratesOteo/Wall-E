@@ -69,7 +69,7 @@ Current macOS local build outputs:
 apps/desktop/src-tauri/target/release/bundle/macos/Wall-E.app
 apps/desktop/src-tauri/target/release/bundle/macos/Wall-E.app.tar.gz
 apps/desktop/src-tauri/target/release/bundle/macos/Wall-E.app.tar.gz.sig
-apps/desktop/src-tauri/target/release/bundle/dmg/Wall-E_0.1.0_aarch64.dmg
+apps/desktop/src-tauri/target/release/bundle/dmg/Wall-E_0.1.1_aarch64.dmg
 ```
 
 The `.tar.gz` and `.sig` files are used by the updater. The DMG remains useful for first install.
