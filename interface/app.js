@@ -5,6 +5,16 @@ const modelSelect = document.querySelector("#modelSelect");
 const projectPath = document.querySelector("#projectPath");
 const providerName = document.querySelector("#providerName");
 const changeProjectButton = document.querySelector("#changeProjectButton");
+const newWorkspaceButton = document.querySelector("#newWorkspaceButton");
+const workspaceTitle = document.querySelector("#workspaceTitle");
+const workspaceMode = document.querySelector("#workspaceMode");
+const workspaceNavItems = Array.from(document.querySelectorAll(".nav-item"));
+const pinnedProjectButton = document.querySelector("#pinnedProjectButton");
+const addPinnedProjectButton = document.querySelector("#addPinnedProjectButton");
+const editPlanButton = document.querySelector("#editPlanButton");
+const taskList = document.querySelector("#taskList");
+const newAutomationButton = document.querySelector("#newAutomationButton");
+const automationList = document.querySelector("#automationList");
 const profileButton = document.querySelector("#profileButton");
 const profileAvatar = document.querySelector("#profileAvatar");
 const profileName = document.querySelector("#profileName");
@@ -32,6 +42,8 @@ const checkUpdatesButton = document.querySelector("#checkUpdatesButton");
 const installUpdateButton = document.querySelector("#installUpdateButton");
 const restartAppButton = document.querySelector("#restartAppButton");
 const deleteProviderKeyButton = document.querySelector("#deleteProviderKeyButton");
+const activityTabs = Array.from(document.querySelectorAll("[data-activity-tab]"));
+const activityPanels = Array.from(document.querySelectorAll("[data-activity-panel]"));
 const providerOptions = Array.from(document.querySelectorAll(".provider-option"));
 const invoke = window.__TAURI__?.core?.invoke;
 const openDialog = window.__TAURI__?.dialog?.open;
@@ -80,6 +92,45 @@ const state = {
   updateStatus: null,
   keyStatus: null,
   projectPath: localStorage.getItem("wall-e-project-path") || projectPath.textContent,
+  workspace: localStorage.getItem("wall-e-workspace") || "build",
+  activityView: localStorage.getItem("wall-e-activity-view") || "files",
+  planEditing: false,
+};
+
+const workspacePresets = {
+  build: {
+    title: "Build Wall-E",
+    mode: "Build",
+    intro: "Build workspace selected. I am ready to inspect, edit, test, and ship.",
+    tasks: [
+      ["done", "Create app interface"],
+      ["active", "Wire chat to ADK backend"],
+      ["", "Stream tool calls and diffs"],
+      ["", "Add approvals and automations"],
+    ],
+  },
+  review: {
+    title: "Repo Review",
+    mode: "Review",
+    intro: "Review workspace selected. Ask me to inspect changes, find risks, or summarize the codebase.",
+    tasks: [
+      ["active", "Check changed files"],
+      ["", "Review risky behavior"],
+      ["", "Call out missing tests"],
+      ["", "Summarize next fixes"],
+    ],
+  },
+  automate: {
+    title: "Automation Plans",
+    mode: "Automate",
+    intro: "Automation workspace selected. We can define recurring repo scans, dependency checks, and approval rules.",
+    tasks: [
+      ["active", "Choose automation trigger"],
+      ["", "Define prompt and project"],
+      ["", "Set approval policy"],
+      ["", "Review run history"],
+    ],
+  },
 };
 
 function providerFromModel(model) {
@@ -129,12 +180,72 @@ function renderProviderState() {
   });
 }
 
+function renderWorkspaceState(announce = false) {
+  const workspace = workspacePresets[state.workspace] || workspacePresets.build;
+  workspaceTitle.textContent = workspace.title;
+  workspaceMode.textContent = workspace.mode;
+
+  workspaceNavItems.forEach((item) => {
+    item.classList.toggle("active", item.dataset.workspace === state.workspace);
+  });
+
+  taskList.replaceChildren(
+    ...workspace.tasks.map(([className, text]) => {
+      const item = document.createElement("li");
+      if (className) item.className = className;
+      item.textContent = text;
+      return item;
+    }),
+  );
+
+  localStorage.setItem("wall-e-workspace", state.workspace);
+  if (announce) {
+    addMessage("assistant", workspace.intro);
+  }
+}
+
+function renderActivityView() {
+  activityTabs.forEach((tab) => {
+    const active = tab.dataset.activityTab === state.activityView;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
+
+  activityPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.activityPanel !== state.activityView;
+  });
+
+  localStorage.setItem("wall-e-activity-view", state.activityView);
+}
+
 function renderProfileState() {
   const initials = (state.profileInitials || state.profileName.slice(0, 1) || "S").trim().slice(0, 2).toUpperCase();
   profileName.textContent = state.profileName || "Socrates";
   profileAvatar.textContent = initials;
   settingsProfileName.value = state.profileName;
   settingsProfileInitials.value = initials;
+}
+
+function resetConversation() {
+  state.sessionId = "";
+  localStorage.removeItem("wall-e-session-id");
+  messages.replaceChildren();
+  addMessage("assistant", "New workspace started. Pick a project or send me a task.");
+  promptInput.focus();
+}
+
+async function setProjectPath(nextPath, announce = true) {
+  if (!nextPath) return;
+
+  state.projectPath = String(nextPath).trim();
+  state.sessionId = "";
+  localStorage.removeItem("wall-e-session-id");
+  projectPath.textContent = state.projectPath;
+  settingsProjectPath.value = state.projectPath;
+  await saveDesktopState();
+  if (announce) {
+    addMessage("assistant", `Project set to ${state.projectPath}.`);
+  }
 }
 
 function renderAppInfo() {
@@ -554,14 +665,64 @@ modelSelect.addEventListener("change", () => {
 
 changeProjectButton.addEventListener("click", async () => {
   const nextPath = await pickProjectFolder();
-  if (!nextPath) return;
+  await setProjectPath(nextPath);
+});
 
-  state.projectPath = String(nextPath).trim();
-  state.sessionId = "";
-  localStorage.removeItem("wall-e-session-id");
-  projectPath.textContent = state.projectPath;
-  saveDesktopState();
-  addMessage("assistant", `Project set to ${state.projectPath}.`);
+newWorkspaceButton.addEventListener("click", () => {
+  state.workspace = "build";
+  renderWorkspaceState();
+  resetConversation();
+});
+
+workspaceNavItems.forEach((item) => {
+  item.addEventListener("click", (event) => {
+    event.preventDefault();
+    state.workspace = item.dataset.workspace || "build";
+    renderWorkspaceState(true);
+  });
+});
+
+pinnedProjectButton.addEventListener("click", async () => {
+  await setProjectPath(pinnedProjectButton.dataset.projectPath);
+});
+
+addPinnedProjectButton.addEventListener("click", async () => {
+  const nextPath = await pickProjectFolder();
+  if (!nextPath) return;
+  pinnedProjectButton.dataset.projectPath = String(nextPath).trim();
+  pinnedProjectButton.textContent = String(nextPath).replace(/^\/Users\/[^/]+/, "");
+  await setProjectPath(nextPath);
+});
+
+editPlanButton.addEventListener("click", () => {
+  state.planEditing = !state.planEditing;
+  taskList.contentEditable = String(state.planEditing);
+  editPlanButton.textContent = state.planEditing ? "Done" : "Edit";
+  taskList.classList.toggle("editing", state.planEditing);
+  if (state.planEditing) taskList.focus();
+});
+
+newAutomationButton.addEventListener("click", () => {
+  state.workspace = "automate";
+  renderWorkspaceState();
+  addMessage("assistant", "Automation draft started. Tell me the trigger, project, prompt, and approval policy you want.");
+});
+
+automationList.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-automation]");
+  if (!button) return;
+
+  state.workspace = "automate";
+  renderWorkspaceState();
+  const label = button.querySelector("span")?.textContent || "Automation";
+  addMessage("assistant", `${label} selected. I can help edit its schedule, prompt, approvals, or run history next.`);
+});
+
+activityTabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    state.activityView = tab.dataset.activityTab || "files";
+    renderActivityView();
+  });
 });
 
 profileButton.addEventListener("click", () => {
@@ -709,6 +870,8 @@ settingsForm.addEventListener("submit", async (event) => {
 renderProviderState();
 renderProfileState();
 renderAppInfo();
+renderWorkspaceState();
+renderActivityView();
 renderBrainStatus();
 renderUpdateStatus();
 loadDesktopState();

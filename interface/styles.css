@@ -547,12 +547,17 @@ textarea:focus {
 }
 
 .file-tree,
+.diff-preview,
 .terminal-preview {
   margin-top: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
   overflow: hidden;
+}
+
+.activity-view[hidden] {
+  display: none;
 }
 
 .file-row {
@@ -577,6 +582,34 @@ textarea:focus {
   padding: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
+}
+
+.diff-preview {
+  padding: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.diff-line {
+  min-height: 24px;
+  color: var(--text);
+}
+
+.diff-line.add {
+  color: var(--green);
+}
+
+.diff-line.muted {
+  color: var(--muted);
+}
+
+.task-list.editing {
+  min-height: 120px;
+  padding: 10px 10px 10px 28px;
+  border: 1px solid var(--accent-strong);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--panel-soft);
 }
 
 .terminal-line {

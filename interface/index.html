@@ -18,21 +18,21 @@
             </div>
           </div>
 
-          <button class="new-thread" type="button">
+          <button class="new-thread" id="newWorkspaceButton" type="button">
             <span aria-hidden="true">+</span>
             New workspace
           </button>
 
           <nav class="nav-list" aria-label="Workspaces">
-            <a class="nav-item active" href="#">
+            <a class="nav-item active" href="#" data-workspace="build">
               <span class="nav-dot build"></span>
               <span>Build Wall-E interface</span>
             </a>
-            <a class="nav-item" href="#">
+            <a class="nav-item" href="#" data-workspace="review">
               <span class="nav-dot review"></span>
               <span>Repo review</span>
             </a>
-            <a class="nav-item" href="#">
+            <a class="nav-item" href="#" data-workspace="automate">
               <span class="nav-dot automate"></span>
               <span>Automation plans</span>
             </a>
@@ -58,8 +58,8 @@
 
           <section class="sidebar-section pinned">
             <h2>Pinned Projects</h2>
-            <button type="button">/Desktop/projects/wall-e</button>
-            <button type="button">Add project</button>
+            <button id="pinnedProjectButton" type="button" data-project-path="/Users/socrates/Desktop/projects/wall-e">/Desktop/projects/wall-e</button>
+            <button id="addPinnedProjectButton" type="button">Add project</button>
           </section>
         </div>
 
@@ -81,7 +81,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">Workspace</p>
-            <h1>Build Wall-E</h1>
+            <h1 id="workspaceTitle">Build Wall-E</h1>
           </div>
           <div class="topbar-actions">
             <label class="model-select">
@@ -160,16 +160,16 @@
               </div>
               <div class="status-row">
                 <span>Mode</span>
-                <strong>Build</strong>
+                <strong id="workspaceMode">Build</strong>
               </div>
             </section>
 
             <section class="context-block">
               <div class="section-heading">
                 <h2>Plan</h2>
-                <button type="button">Edit</button>
+                <button id="editPlanButton" type="button">Edit</button>
               </div>
-              <ol class="task-list">
+              <ol class="task-list" id="taskList">
                 <li class="done">Create app interface</li>
                 <li class="active">Wire chat to ADK backend</li>
                 <li>Stream tool calls and diffs</li>
@@ -180,14 +180,14 @@
             <section class="context-block">
               <div class="section-heading">
                 <h2>Automations</h2>
-                <button type="button">New</button>
+                <button id="newAutomationButton" type="button">New</button>
               </div>
-              <div class="automation-list">
-                <button type="button">
+              <div class="automation-list" id="automationList">
+                <button type="button" data-automation="daily-repo-scan">
                   <span>Daily repo scan</span>
                   <small>Paused</small>
                 </button>
-                <button type="button">
+                <button type="button" data-automation="dependency-monitor">
                   <span>Dependency monitor</span>
                   <small>Ready</small>
                 </button>
@@ -198,13 +198,13 @@
       </main>
 
       <aside class="activity-panel" aria-label="Activity">
-        <div class="tabs" role="tablist" aria-label="Activity views">
-          <button class="active" type="button">Files</button>
-          <button type="button">Diff</button>
-          <button type="button">Terminal</button>
+        <div class="tabs activity-toggle" role="tablist" aria-label="Activity views">
+          <button class="active" type="button" data-activity-tab="files" aria-selected="true">Files</button>
+          <button type="button" data-activity-tab="diff" aria-selected="false">Diff</button>
+          <button type="button" data-activity-tab="terminal" aria-selected="false">Terminal</button>
         </div>
 
-        <section class="file-tree" aria-label="Files">
+        <section class="file-tree activity-view" data-activity-panel="files" aria-label="Files">
           <div class="file-row selected">interface/index.html</div>
           <div class="file-row">interface/styles.css</div>
           <div class="file-row">interface/app.js</div>
@@ -212,7 +212,13 @@
           <div class="file-row">README.md</div>
         </section>
 
-        <section class="terminal-preview" aria-label="Terminal preview">
+        <section class="diff-preview activity-view" data-activity-panel="diff" aria-label="Diff preview" hidden>
+          <div class="diff-line add">+ Settings moved to the sidebar footer</div>
+          <div class="diff-line add">+ Profile and App settings are separate sections</div>
+          <div class="diff-line muted">No live file diff is selected yet.</div>
+        </section>
+
+        <section class="terminal-preview activity-view" data-activity-panel="terminal" aria-label="Terminal preview" hidden>
           <div class="terminal-line muted">$ wall-e status</div>
           <div class="terminal-line ok">brain: ready</div>
           <div class="terminal-line ok">model: openrouter/qwen/qwen3-coder</div>
