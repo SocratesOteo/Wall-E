@@ -483,35 +483,157 @@ function createAssistantMessage() {
   const article = document.createElement("article");
   article.className = "message assistant";
 
-  const avatar = document.createElement("div");
-  avatar.className = "avatar";
-  avatar.textContent = "W";
-
-  const bubble = document.createElement("div");
-  bubble.className = "bubble";
+  const response = document.createElement("div");
+  response.className = "assistant-response";
 
   const meta = document.createElement("div");
   meta.className = "message-meta";
   meta.textContent = "Wall-E";
 
-  const paragraph = document.createElement("p");
-  paragraph.textContent = "";
+  const status = document.createElement("div");
+  status.className = "assistant-status";
+  status.hidden = true;
 
-  bubble.append(meta, paragraph);
-  article.append(avatar, bubble);
+  const content = document.createElement("div");
+  content.className = "assistant-content";
+
+  response.append(meta, status, content);
+  article.append(response);
   messages.append(article);
   messages.scrollTop = messages.scrollHeight;
 
+  let rawText = "";
+
   return {
     append(text) {
-      paragraph.textContent += text;
+      status.hidden = true;
+      rawText += text;
+      renderStructuredText(content, rawText);
       messages.scrollTop = messages.scrollHeight;
     },
     set(text) {
-      paragraph.textContent = text;
+      status.hidden = true;
+      rawText = text;
+      renderStructuredText(content, rawText);
+      messages.scrollTop = messages.scrollHeight;
+    },
+    setStatus(text) {
+      status.hidden = false;
+      status.textContent = text;
+      messages.scrollTop = messages.scrollHeight;
+    },
+    appendActivity(text) {
+      status.hidden = false;
+      status.textContent = text;
       messages.scrollTop = messages.scrollHeight;
     },
   };
+}
+
+function appendTextBlock(parent, tagName, text, className = "") {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  element.textContent = text;
+  parent.append(element);
+  return element;
+}
+
+function renderStructuredText(container, text) {
+  container.replaceChildren();
+
+  const source = (text || "").replace(/\r\n/g, "\n").trimEnd();
+  if (!source.trim()) {
+    appendTextBlock(container, "p", "");
+    return;
+  }
+
+  const lines = source.split("\n");
+  let paragraph = [];
+  let list = null;
+  let codeLines = [];
+  let inCode = false;
+
+  const flushParagraph = () => {
+    const value = paragraph.join(" ").trim();
+    paragraph = [];
+    if (value) appendTextBlock(container, "p", value);
+  };
+
+  const flushList = () => {
+    list = null;
+  };
+
+  const flushCode = () => {
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+    code.textContent = codeLines.join("\n");
+    pre.append(code);
+    container.append(pre);
+    codeLines = [];
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("```")) {
+      if (inCode) {
+        flushCode();
+        inCode = false;
+      } else {
+        flushParagraph();
+        flushList();
+        inCode = true;
+      }
+      continue;
+    }
+
+    if (inCode) {
+      codeLines.push(line);
+      continue;
+    }
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      appendTextBlock(container, `h${Math.min(heading[1].length + 2, 4)}`, heading[2]);
+      continue;
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+    if (bullet) {
+      flushParagraph();
+      if (!list || list.tagName !== "UL") {
+        list = document.createElement("ul");
+        container.append(list);
+      }
+      appendTextBlock(list, "li", bullet[1]);
+      continue;
+    }
+
+    const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (numbered) {
+      flushParagraph();
+      if (!list || list.tagName !== "OL") {
+        list = document.createElement("ol");
+        container.append(list);
+      }
+      appendTextBlock(list, "li", numbered[1]);
+      continue;
+    }
+
+    flushList();
+    paragraph.push(trimmed);
+  }
+
+  if (inCode) flushCode();
+  flushParagraph();
 }
 
 async function streamBrainEvents(sessionId, assistantMessage) {
@@ -553,17 +675,17 @@ function handleBrainEvent(event, assistantMessage) {
   }
 
   if (event.type === "status") {
-    assistantMessage.set(event.content || "Working...");
+    assistantMessage.setStatus(event.content || "Working...");
     return;
   }
 
   if (event.type === "tool_call_started") {
-    assistantMessage.append(`\n\nRunning ${event.toolName || "tool"}...`);
+    assistantMessage.appendActivity(`Running ${event.toolName || "tool"}...`);
     return;
   }
 
   if (event.type === "tool_call_finished") {
-    assistantMessage.append(`\nFinished ${event.toolName || "tool"}.`);
+    assistantMessage.appendActivity(`Finished ${event.toolName || "tool"}.`);
     return;
   }
 
@@ -614,6 +736,12 @@ async function pickProjectFolder() {
 }
 
 function addMessage(role, text) {
+  if (role === "assistant") {
+    const assistantMessage = createAssistantMessage();
+    assistantMessage.set(text);
+    return;
+  }
+
   const article = document.createElement("article");
   article.className = `message ${role}`;
 

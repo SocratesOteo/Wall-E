@@ -375,6 +375,12 @@ h1 {
   max-width: 820px;
 }
 
+.message.assistant {
+  display: block;
+  max-width: 880px;
+  padding: 2px 4px 8px;
+}
+
 .message.user {
   align-self: flex-end;
 }
@@ -399,6 +405,69 @@ h1 {
 .bubble p {
   margin: 0;
   line-height: 1.55;
+}
+
+.assistant-response {
+  color: var(--text);
+}
+
+.assistant-response .message-meta {
+  margin-bottom: 8px;
+}
+
+.assistant-status {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.assistant-status[hidden] {
+  display: none;
+}
+
+.assistant-content {
+  display: grid;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.assistant-content p,
+.assistant-content ul,
+.assistant-content ol,
+.assistant-content pre,
+.assistant-content h3,
+.assistant-content h4 {
+  margin: 0;
+}
+
+.assistant-content h3,
+.assistant-content h4 {
+  padding-top: 4px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.assistant-content ul,
+.assistant-content ol {
+  display: grid;
+  gap: 6px;
+  padding-left: 20px;
+}
+
+.assistant-content li {
+  padding-left: 2px;
+}
+
+.assistant-content pre {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0b0d10;
+  padding: 12px;
+  color: #d7e0ea;
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .composer {
