@@ -126,7 +126,7 @@ async def create_session(request: CreateSessionRequest) -> dict[str, Any]:
     )
     runners[session.id] = Runner(
         app_name=APP_NAME,
-        agent=create_wall_e_agent(session.model),
+        agent=create_wall_e_agent(session.model, api_base=session.api_base),
         session_service=session_service,
     )
     event_queues[session.id] = asyncio.Queue()

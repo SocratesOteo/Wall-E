@@ -1,6 +1,6 @@
 [package]
 name = "wall-e-desktop"
-version = "0.1.3"
+version = "0.1.4"
 description = "Native desktop shell for Wall-E"
 authors = ["Socrates Oteo"]
 edition = "2021"

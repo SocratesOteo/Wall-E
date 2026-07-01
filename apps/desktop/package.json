@@ -1,6 +1,6 @@
 {
   "name": "wall-e-desktop",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Native desktop shell for Wall-E.",
   "type": "module",

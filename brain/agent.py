@@ -41,12 +41,25 @@ WALL_E_MODEL_NAME = os.environ.get(
     "WALL_E_MODEL",
     "openrouter/qwen/qwen3-coder",
 )
-WALL_E_MODEL = LiteLlm(model=WALL_E_MODEL_NAME)
+WALL_E_API_BASE = os.environ.get("WALL_E_API_BASE")
 
 
-def create_wall_e_agent(model_name: str | None = None) -> LlmAgent:
+def llm_kwargs(api_base: str | None = None) -> dict[str, str]:
+    """Build optional LiteLLM arguments from Wall-E provider settings."""
+    if not api_base:
+        return {}
+    return {"api_base": api_base}
+
+
+WALL_E_MODEL = LiteLlm(model=WALL_E_MODEL_NAME, **llm_kwargs(WALL_E_API_BASE))
+
+
+def create_wall_e_agent(model_name: str | None = None, api_base: str | None = None) -> LlmAgent:
     """Create a Wall-E agent for a model selection."""
-    model = LiteLlm(model=model_name or WALL_E_MODEL_NAME)
+    model = LiteLlm(
+        model=model_name or WALL_E_MODEL_NAME,
+        **llm_kwargs(api_base or WALL_E_API_BASE),
+    )
     return LlmAgent(
         name="wall_e",
         model=model,

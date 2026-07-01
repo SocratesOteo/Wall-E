@@ -390,15 +390,41 @@ fn start_brain(
             }
         }
 
-        let child = Command::new("python3")
+        let settings = read_settings()?;
+        let mut command = Command::new("python3");
+        command
             .arg("-m")
             .arg("brain.server")
             .current_dir(repo_root())
             .env("WALL_E_BRAIN_HOST", "127.0.0.1")
             .env("WALL_E_BRAIN_PORT", port)
+            .env("WALL_E_PROVIDER", &settings.provider)
+            .env("WALL_E_MODEL", &settings.model)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::null());
+
+        if let Some(api_base) = settings
+            .api_base
+            .as_ref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            command.env("WALL_E_API_BASE", api_base);
+        }
+
+        if let Some(key_name) = provider_key_name(&settings.provider) {
+            if let Ok(api_key) = keychain_entry(&settings.provider).and_then(|entry| {
+                entry
+                    .get_password()
+                    .map_err(|err| format!("Could not read API key from OS keychain: {err}"))
+            }) {
+                if !api_key.is_empty() {
+                    command.env(key_name, api_key);
+                }
+            }
+        }
+
+        let child = command
             .spawn()
             .map_err(|err| format!("Could not start Wall-E brain process: {err}"))?;
 
