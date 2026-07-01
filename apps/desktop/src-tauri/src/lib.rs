@@ -3,7 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 const DEFAULT_MODEL: &str = "openrouter/qwen/qwen3-coder";
 const DEFAULT_PROVIDER: &str = "openrouter";
@@ -45,6 +46,17 @@ struct BrainStatus {
     message: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateStatus {
+    available: bool,
+    current_version: String,
+    version: Option<String>,
+    notes: Option<String>,
+    date: Option<String>,
+    message: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SaveProviderKeyRequest {
@@ -67,6 +79,11 @@ struct StartBrainRequest {
 struct BrainProcessState {
     child: Mutex<Option<Child>>,
     url: Mutex<String>,
+}
+
+#[derive(Default)]
+struct PendingUpdateState {
+    update: Mutex<Option<Update>>,
 }
 
 impl Default for AppSettings {
@@ -418,11 +435,89 @@ fn stop_brain(state: State<'_, BrainProcessState>) -> Result<BrainStatus, String
     current_brain_status(&state, "Brain process stopped.")
 }
 
+#[tauri::command]
+async fn check_for_update(
+    app: AppHandle,
+    state: State<'_, PendingUpdateState>,
+) -> Result<UpdateStatus, String> {
+    let current_version = app.package_info().version.to_string();
+    let update = app
+        .updater()
+        .map_err(|err| format!("Could not initialize updater: {err}"))?
+        .check()
+        .await
+        .map_err(|err| format!("Could not check for updates: {err}"))?;
+
+    let status = update.as_ref().map_or_else(
+        || UpdateStatus {
+            available: false,
+            current_version: current_version.clone(),
+            version: None,
+            notes: None,
+            date: None,
+            message: "Wall-E is up to date.".to_string(),
+        },
+        |update| UpdateStatus {
+            available: true,
+            current_version: current_version.clone(),
+            version: Some(update.version.clone()),
+            notes: update.body.clone(),
+            date: update.date.map(|date| date.to_string()),
+            message: format!("Wall-E {} is available.", update.version),
+        },
+    );
+
+    *state
+        .update
+        .lock()
+        .map_err(|_| "Pending update lock was poisoned.".to_string())? = update;
+
+    Ok(status)
+}
+
+#[tauri::command]
+async fn install_pending_update(
+    state: State<'_, PendingUpdateState>,
+) -> Result<UpdateStatus, String> {
+    let update = state
+        .update
+        .lock()
+        .map_err(|_| "Pending update lock was poisoned.".to_string())?
+        .take()
+        .ok_or_else(|| "No pending update. Check for updates first.".to_string())?;
+
+    let version = update.version.clone();
+    let current_version = update.current_version.clone();
+    let notes = update.body.clone();
+    let date = update.date.map(|date| date.to_string());
+
+    update
+        .download_and_install(|_chunk_length, _content_length| {}, || {})
+        .await
+        .map_err(|err| format!("Could not install update: {err}"))?;
+
+    Ok(UpdateStatus {
+        available: false,
+        current_version,
+        version: Some(version.clone()),
+        notes,
+        date,
+        message: format!("Wall-E {version} installed. Restart Wall-E to finish updating."),
+    })
+}
+
+#[tauri::command]
+fn restart_app(app: AppHandle) {
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(BrainProcessState::default())
+        .manage(PendingUpdateState::default())
         .invoke_handler(tauri::generate_handler![
             get_app_info,
             load_settings,
@@ -432,7 +527,10 @@ pub fn run() {
             delete_provider_key,
             get_brain_status,
             start_brain,
-            stop_brain
+            stop_brain,
+            check_for_update,
+            install_pending_update,
+            restart_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running Wall-E desktop application");

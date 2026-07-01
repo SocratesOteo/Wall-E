@@ -166,7 +166,7 @@ Steps:
 
 1. Add macOS app packaging. In progress with `npm run package` and `docs/PACKAGING.md`.
 2. Add signed/notarized build path when ready.
-3. Add update channel planning.
+3. Add update channel planning. Done with Tauri updater pointed at GitHub Releases.
 4. Add smoke tests for:
    - App launch
    - Brain startup

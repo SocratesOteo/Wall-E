@@ -164,6 +164,7 @@ npm run dev
 The Tauri app embeds the existing `interface/` renderer and adds native commands for app info, local settings persistence, and a native folder picker.
 The settings panel includes provider presets for Ollama, OpenRouter, DeepSeek, and Groq. Ollama runs locally without an API key; hosted provider keys are stored through the OS keychain.
 The desktop app can also start and stop the local Python brain process for you, so the composer can connect without a separate brain terminal.
+Packaged desktop builds can check GitHub Releases for signed updates from Settings.
 
 Packaging notes live in `docs/PACKAGING.md`.
 

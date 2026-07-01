@@ -15,11 +15,15 @@ const settingsBrainBaseUrl = document.querySelector("#settingsBrainBaseUrl");
 const settingsApiKeyField = document.querySelector("#settingsApiKeyField");
 const settingsApiKey = document.querySelector("#settingsApiKey");
 const brainStatusCallout = document.querySelector("#brainStatusCallout");
+const updateStatusCallout = document.querySelector("#updateStatusCallout");
 const settingsKeyCallout = document.querySelector("#settingsKeyCallout");
 const settingsNote = document.querySelector("#settingsNote");
 const resetProviderButton = document.querySelector("#resetProviderButton");
 const startBrainButton = document.querySelector("#startBrainButton");
 const stopBrainButton = document.querySelector("#stopBrainButton");
+const checkUpdatesButton = document.querySelector("#checkUpdatesButton");
+const installUpdateButton = document.querySelector("#installUpdateButton");
+const restartAppButton = document.querySelector("#restartAppButton");
 const deleteProviderKeyButton = document.querySelector("#deleteProviderKeyButton");
 const providerOptions = Array.from(document.querySelectorAll(".provider-option"));
 const invoke = window.__TAURI__?.core?.invoke;
@@ -63,6 +67,7 @@ const state = {
   brainBaseUrl: localStorage.getItem("wall-e-brain-base-url") || "http://127.0.0.1:8765",
   sessionId: localStorage.getItem("wall-e-session-id") || "",
   brainStatus: null,
+  updateStatus: null,
   keyStatus: null,
   projectPath: localStorage.getItem("wall-e-project-path") || projectPath.textContent,
 };
@@ -158,6 +163,32 @@ function renderBrainStatus() {
     : `Brain stopped. It will run at ${state.brainBaseUrl}.`;
   startBrainButton.hidden = status.running;
   stopBrainButton.hidden = !status.running;
+}
+
+function renderUpdateStatus() {
+  const isNative = Boolean(invoke);
+  const status = state.updateStatus;
+
+  if (!isNative) {
+    updateStatusCallout.textContent = "Native updates are available in the desktop app.";
+    checkUpdatesButton.hidden = true;
+    installUpdateButton.hidden = true;
+    restartAppButton.hidden = true;
+    return;
+  }
+
+  if (!status) {
+    updateStatusCallout.textContent = "Wall-E can check GitHub Releases for signed updates.";
+    checkUpdatesButton.hidden = false;
+    installUpdateButton.hidden = true;
+    restartAppButton.hidden = true;
+    return;
+  }
+
+  updateStatusCallout.textContent = status.message || "Update status checked.";
+  checkUpdatesButton.hidden = false;
+  installUpdateButton.hidden = !status.available;
+  restartAppButton.hidden = status.available || !status.version;
 }
 
 async function refreshBrainStatus() {
@@ -491,6 +522,7 @@ settingsButton.addEventListener("click", () => {
   renderProviderState();
   refreshProviderKeyStatus();
   refreshBrainStatus();
+  renderUpdateStatus();
   settingsDialog.showModal();
 });
 
@@ -533,6 +565,40 @@ stopBrainButton.addEventListener("click", async () => {
     addMessage("assistant", "Brain stopped.");
   } catch (error) {
     addMessage("assistant", `Brain could not be stopped: ${error}`);
+  }
+});
+
+checkUpdatesButton.addEventListener("click", async () => {
+  try {
+    updateStatusCallout.textContent = "Checking GitHub Releases for updates...";
+    const status = await desktopCommand("check_for_update");
+    state.updateStatus = status;
+    renderUpdateStatus();
+    addMessage("assistant", status.message || "Update check finished.");
+  } catch (error) {
+    state.updateStatus = null;
+    renderUpdateStatus();
+    addMessage("assistant", `Update check failed: ${error}`);
+  }
+});
+
+installUpdateButton.addEventListener("click", async () => {
+  try {
+    updateStatusCallout.textContent = "Downloading and installing the signed update...";
+    const status = await desktopCommand("install_pending_update");
+    state.updateStatus = status;
+    renderUpdateStatus();
+    addMessage("assistant", status.message || "Update installed. Restart Wall-E to finish.");
+  } catch (error) {
+    addMessage("assistant", `Update install failed: ${error}`);
+  }
+});
+
+restartAppButton.addEventListener("click", async () => {
+  try {
+    await desktopCommand("restart_app");
+  } catch (error) {
+    addMessage("assistant", `Wall-E could not restart automatically: ${error}`);
   }
 });
 
@@ -592,4 +658,5 @@ settingsForm.addEventListener("submit", async (event) => {
 
 renderProviderState();
 renderBrainStatus();
+renderUpdateStatus();
 loadDesktopState();

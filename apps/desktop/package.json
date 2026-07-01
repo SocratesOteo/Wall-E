@@ -5,6 +5,7 @@
   "description": "Native desktop shell for Wall-E.",
   "type": "module",
   "scripts": {
+    "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
     "package": "tauri build",
