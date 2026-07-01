@@ -9,6 +9,9 @@
     "build": "tauri build",
     "info": "tauri info"
   },
+  "dependencies": {
+    "@tauri-apps/plugin-dialog": "^2.0.0"
+  },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"
   }

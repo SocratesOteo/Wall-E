@@ -185,7 +185,7 @@ Acceptance:
 1. Scaffold `apps/desktop/` with Tauri. Done.
 2. Move the existing `interface/` shell into the Tauri renderer. Done by embedding `interface/` as the desktop frontend.
 3. Add local settings persistence for model and project path. Done with native settings commands and `~/.wall-e/settings.json`.
-4. Add a native project picker.
+4. Add a native project picker. Done with Tauri's dialog plugin.
 5. Define the local brain API contract in `docs/brain-api.md`.
 6. Add a minimal Python API wrapper around the ADK brain.
 7. Stream mock events from the brain wrapper into the desktop app.

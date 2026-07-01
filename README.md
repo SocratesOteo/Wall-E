@@ -152,7 +152,7 @@ npm install
 npm run dev
 ```
 
-The Tauri app embeds the existing `interface/` renderer and adds native commands for app info and local settings persistence.
+The Tauri app embeds the existing `interface/` renderer and adds native commands for app info, local settings persistence, and a native folder picker.
 
 You can still open `interface/index.html` in a browser to try the shell without native features. It currently provides:
 

@@ -6,6 +6,7 @@ const projectPath = document.querySelector("#projectPath");
 const providerName = document.querySelector("#providerName");
 const changeProjectButton = document.querySelector("#changeProjectButton");
 const invoke = window.__TAURI__?.core?.invoke;
+const openDialog = window.__TAURI__?.dialog?.open;
 
 const state = {
   model: localStorage.getItem("wall-e-model") || modelSelect.value,
@@ -55,6 +56,19 @@ async function saveDesktopState() {
   } catch (error) {
     addMessage("assistant", `Native settings could not be saved: ${error}`);
   }
+}
+
+async function pickProjectFolder() {
+  if (openDialog) {
+    return openDialog({
+      directory: true,
+      multiple: false,
+      title: "Choose Wall-E project folder",
+      defaultPath: state.projectPath,
+    });
+  }
+
+  return window.prompt("Project folder path", state.projectPath);
 }
 
 function addMessage(role, text) {
@@ -119,11 +133,11 @@ modelSelect.addEventListener("change", () => {
   addMessage("assistant", `Model preference set to ${state.model}.`);
 });
 
-changeProjectButton.addEventListener("click", () => {
-  const nextPath = window.prompt("Project folder path", state.projectPath);
+changeProjectButton.addEventListener("click", async () => {
+  const nextPath = await pickProjectFolder();
   if (!nextPath) return;
 
-  state.projectPath = nextPath.trim();
+  state.projectPath = String(nextPath).trim();
   projectPath.textContent = state.projectPath;
   saveDesktopState();
   addMessage("assistant", `Project set to ${state.projectPath}.`);
