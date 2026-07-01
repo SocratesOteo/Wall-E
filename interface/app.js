@@ -11,9 +11,12 @@ const settingsForm = document.querySelector("#settingsForm");
 const closeSettingsButton = document.querySelector("#closeSettingsButton");
 const settingsModel = document.querySelector("#settingsModel");
 const settingsApiBase = document.querySelector("#settingsApiBase");
+const settingsApiKeyField = document.querySelector("#settingsApiKeyField");
+const settingsApiKey = document.querySelector("#settingsApiKey");
 const settingsKeyCallout = document.querySelector("#settingsKeyCallout");
 const settingsNote = document.querySelector("#settingsNote");
 const resetProviderButton = document.querySelector("#resetProviderButton");
+const deleteProviderKeyButton = document.querySelector("#deleteProviderKeyButton");
 const providerOptions = Array.from(document.querySelectorAll(".provider-option"));
 const invoke = window.__TAURI__?.core?.invoke;
 const openDialog = window.__TAURI__?.dialog?.open;
@@ -53,6 +56,7 @@ const state = {
   model: localStorage.getItem("wall-e-model") || modelSelect.value,
   provider: localStorage.getItem("wall-e-provider") || providerFromModel(modelSelect.value),
   apiBase: localStorage.getItem("wall-e-api-base") || "",
+  keyStatus: null,
   projectPath: localStorage.getItem("wall-e-project-path") || projectPath.textContent,
 };
 
@@ -81,18 +85,41 @@ function refreshModelOptions() {
 
 function renderProviderState() {
   const preset = currentPreset();
+  const hasKey = Boolean(state.keyStatus?.hasKey);
   refreshModelOptions();
   projectPath.textContent = state.projectPath;
   providerName.textContent = providerLabel(state.provider);
   settingsModel.value = state.model;
   settingsApiBase.value = state.apiBase || preset.apiBase;
+  settingsApiKeyField.hidden = !preset.keyName;
+  settingsApiKey.value = "";
+  settingsApiKey.placeholder = hasKey ? "Key saved in OS keychain" : "Paste key to save in OS keychain";
+  deleteProviderKeyButton.hidden = !preset.keyName || !hasKey;
   settingsKeyCallout.textContent = preset.keyName
-    ? `Key required later: ${preset.keyName}. Wall-E does not store API keys in plaintext.`
+    ? `${preset.keyName}: ${hasKey ? "saved in OS keychain" : "not saved yet"}. Wall-E never writes this key to settings or localStorage.`
     : "No API key required for this provider.";
   settingsNote.textContent = preset.note;
   providerOptions.forEach((option) => {
     option.classList.toggle("active", option.dataset.provider === state.provider);
   });
+}
+
+async function refreshProviderKeyStatus() {
+  const preset = currentPreset();
+  if (!preset.keyName) {
+    state.keyStatus = { provider: state.provider, hasKey: false, keyName: null };
+    renderProviderState();
+    return;
+  }
+
+  try {
+    const status = await desktopCommand("get_provider_key_status", { provider: state.provider });
+    state.keyStatus = status || { provider: state.provider, hasKey: false, keyName: preset.keyName };
+  } catch (error) {
+    state.keyStatus = { provider: state.provider, hasKey: false, keyName: preset.keyName };
+    addMessage("assistant", `OS keychain status could not be checked: ${error}`);
+  }
+  renderProviderState();
 }
 
 async function desktopCommand(command, args) {
@@ -110,6 +137,7 @@ async function loadDesktopState() {
     state.apiBase = settings.apiBase || "";
     state.projectPath = settings.projectPath || state.projectPath;
     renderProviderState();
+    refreshProviderKeyStatus();
   } catch (error) {
     addMessage("assistant", `Native settings could not be loaded: ${error}`);
   }
@@ -142,7 +170,9 @@ function useProviderPreset(provider) {
   state.provider = provider;
   state.model = preset.model;
   state.apiBase = preset.apiBase;
+  state.keyStatus = null;
   renderProviderState();
+  refreshProviderKeyStatus();
 }
 
 async function pickProjectFolder() {
@@ -236,6 +266,7 @@ changeProjectButton.addEventListener("click", async () => {
 
 settingsButton.addEventListener("click", () => {
   renderProviderState();
+  refreshProviderKeyStatus();
   settingsDialog.showModal();
 });
 
@@ -253,15 +284,52 @@ resetProviderButton.addEventListener("click", () => {
   useProviderPreset(state.provider);
 });
 
-settingsForm.addEventListener("submit", (event) => {
+deleteProviderKeyButton.addEventListener("click", async () => {
+  try {
+    const status = await desktopCommand("delete_provider_key", {
+      request: { provider: state.provider },
+    });
+    state.keyStatus = status || { provider: state.provider, hasKey: false, keyName: currentPreset().keyName };
+    renderProviderState();
+    addMessage("assistant", `${providerLabel(state.provider)} API key removed from the OS keychain.`);
+  } catch (error) {
+    addMessage("assistant", `API key could not be removed from the OS keychain: ${error}`);
+  }
+});
+
+settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   state.model = settingsModel.value.trim();
   state.provider = providerFromModel(state.model) || state.provider;
   state.apiBase = settingsApiBase.value.trim();
+  const apiKey = settingsApiKey.value.trim();
   renderProviderState();
-  saveDesktopState();
+  await saveDesktopState();
+
+  if (currentPreset().keyName && apiKey) {
+    if (!invoke) {
+      addMessage("assistant", "API keys can only be saved from the native app because browser mode has no OS keychain access.");
+      return;
+    }
+
+    try {
+      const status = await desktopCommand("save_provider_key", {
+        request: {
+          provider: state.provider,
+          apiKey,
+        },
+      });
+      state.keyStatus = status;
+      settingsApiKey.value = "";
+      renderProviderState();
+    } catch (error) {
+      addMessage("assistant", `API key could not be saved to the OS keychain: ${error}`);
+      return;
+    }
+  }
+
   settingsDialog.close();
-  addMessage("assistant", `${providerLabel(state.provider)} saved with ${state.model}. ${currentPreset().keyName ? `Set ${currentPreset().keyName} before running hosted requests.` : "Provider settings are ready."}`);
+  addMessage("assistant", `${providerLabel(state.provider)} saved with ${state.model}. ${currentPreset().keyName && !state.keyStatus?.hasKey ? `Save ${currentPreset().keyName} before running hosted requests.` : "Provider settings are ready."}`);
 });
 
 renderProviderState();

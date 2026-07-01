@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 const DEFAULT_MODEL: &str = "openrouter/qwen/qwen3-coder";
 const DEFAULT_PROVIDER: &str = "openrouter";
+const KEYCHAIN_SERVICE: &str = "Wall-E";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +21,27 @@ struct AppSettings {
     provider: String,
     api_base: Option<String>,
     project_path: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct KeyStatus {
+    provider: String,
+    has_key: bool,
+    key_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveProviderKeyRequest {
+    provider: String,
+    api_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderKeyRequest {
+    provider: String,
 }
 
 impl Default for AppSettings {
@@ -42,6 +64,21 @@ fn settings_dir() -> Result<PathBuf, String> {
 
 fn settings_path() -> Result<PathBuf, String> {
     Ok(settings_dir()?.join("settings.json"))
+}
+
+fn provider_key_name(provider: &str) -> Option<&'static str> {
+    match provider {
+        "openrouter" => Some("OPENROUTER_API_KEY"),
+        "deepseek" => Some("DEEPSEEK_API_KEY"),
+        "groq" => Some("GROQ_API_KEY"),
+        _ => None,
+    }
+}
+
+fn keychain_entry(provider: &str) -> Result<keyring::Entry, String> {
+    let account = format!("provider:{provider}");
+    keyring::Entry::new(KEYCHAIN_SERVICE, &account)
+        .map_err(|err| format!("Could not access OS keychain for {provider}: {err}"))
 }
 
 fn read_settings() -> Result<AppSettings, String> {
@@ -110,6 +147,74 @@ fn save_settings(settings: AppSettings) -> Result<AppSettings, String> {
     Ok(settings)
 }
 
+#[tauri::command]
+fn get_provider_key_status(provider: String) -> Result<KeyStatus, String> {
+    if provider_key_name(&provider).is_none() {
+        return Ok(KeyStatus {
+            provider,
+            has_key: false,
+            key_name: None,
+        });
+    }
+
+    let entry = keychain_entry(&provider)?;
+    let has_key = entry
+        .get_password()
+        .is_ok_and(|password| !password.is_empty());
+
+    Ok(KeyStatus {
+        key_name: provider_key_name(&provider).map(str::to_string),
+        provider,
+        has_key,
+    })
+}
+
+#[tauri::command]
+fn save_provider_key(request: SaveProviderKeyRequest) -> Result<KeyStatus, String> {
+    if provider_key_name(&request.provider).is_none() {
+        return Err(format!(
+            "Provider does not use an API key: {}",
+            request.provider
+        ));
+    }
+
+    let api_key = request.api_key.trim();
+    if api_key.is_empty() {
+        return Err("API key cannot be empty.".to_string());
+    }
+
+    let entry = keychain_entry(&request.provider)?;
+    entry
+        .set_password(api_key)
+        .map_err(|err| format!("Could not save API key in OS keychain: {err}"))?;
+
+    get_provider_key_status(request.provider)
+}
+
+#[tauri::command]
+fn delete_provider_key(request: ProviderKeyRequest) -> Result<KeyStatus, String> {
+    if provider_key_name(&request.provider).is_none() {
+        return Ok(KeyStatus {
+            provider: request.provider,
+            has_key: false,
+            key_name: None,
+        });
+    }
+
+    let entry = keychain_entry(&request.provider)?;
+    match entry.delete_credential() {
+        Ok(()) => {}
+        Err(err) => {
+            let message = err.to_string();
+            if !message.to_lowercase().contains("not found") {
+                return Err(format!("Could not delete API key from OS keychain: {err}"));
+            }
+        }
+    }
+
+    get_provider_key_status(request.provider)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -117,7 +222,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_app_info,
             load_settings,
-            save_settings
+            save_settings,
+            get_provider_key_status,
+            save_provider_key,
+            delete_provider_key
         ])
         .run(tauri::generate_context!())
         .expect("error while running Wall-E desktop application");

@@ -62,6 +62,7 @@ The current desktop package includes:
 - Existing `interface/` renderer
 - Native folder picker
 - Local settings persistence through `~/.wall-e/settings.json`
+- Hosted provider API key storage through the OS keychain
 
 The current desktop package does not yet include:
 
@@ -70,6 +71,12 @@ The current desktop package does not yet include:
 - API key setup UI
 - Signed/notarized macOS distribution
 - Auto-updates
+
+## Secrets
+
+Provider, model, base URL, and project path live in `~/.wall-e/settings.json`.
+
+Hosted provider API keys do not live in that file. Wall-E stores them in the OS keychain under the `Wall-E` service, using one entry per provider.
 
 ## Release Hardening Checklist
 

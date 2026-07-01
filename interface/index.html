@@ -248,11 +248,17 @@
           <input id="settingsApiBase" name="apiBase" autocomplete="off" />
         </label>
 
+        <label class="settings-field" id="settingsApiKeyField">
+          <span>API key</span>
+          <input id="settingsApiKey" name="apiKey" type="password" autocomplete="off" placeholder="Stored in OS keychain" />
+        </label>
+
         <div class="key-callout" id="settingsKeyCallout"></div>
         <p class="settings-note" id="settingsNote"></p>
 
         <footer class="settings-actions">
           <button type="button" id="resetProviderButton">Use Preset</button>
+          <button type="button" id="deleteProviderKeyButton">Delete Key</button>
           <button class="send-button" type="submit">Save</button>
         </footer>
       </form>
