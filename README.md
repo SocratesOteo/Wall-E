@@ -172,9 +172,9 @@ You can still open `interface/index.html` in a browser to try the shell without 
 - Chat workspace with a composer and model selector
 - Project, branch, provider, and plan panels
 - File, diff, terminal, and automation placeholders
-- Local mock replies while the ADK backend wiring is added
+- Real ADK brain streaming when the local brain API is running
 
-The next step is to connect the composer to the Python ADK brain and stream tool calls, file diffs, terminal output, approvals, and automation events into the right panels.
+The next step is to move tool calls, file diffs, terminal output, approvals, and automation events into dedicated activity panels instead of rendering the first-pass stream in chat.
 
 The local brain API contract lives in `docs/brain-api.md`. Start the first mock streaming API with:
 
@@ -182,7 +182,7 @@ The local brain API contract lives in `docs/brain-api.md`. Start the first mock 
 python -m brain.server
 ```
 
-Once the server is running, the desktop composer sends messages to the local brain API and renders streamed events. In the native app, Wall-E starts the local brain automatically before sending a message. The default brain URL is `http://127.0.0.1:8765` and can be changed in Settings.
+Once the server is running, the desktop composer sends messages to the local ADK brain and renders streamed events. In the native app, Wall-E starts the local brain automatically before sending a message. The default brain URL is `http://127.0.0.1:8765` and can be changed in Settings.
 
 ---
 

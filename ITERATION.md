@@ -192,7 +192,8 @@ Acceptance:
 8. Add a minimal Python API wrapper around the ADK brain. Started with `brain/server.py`.
 9. Stream mock events from the brain wrapper into the desktop app. Done.
 10. Let the desktop app start and stop the local Python brain process. Done.
-11. Replace mock events with real Wall-E agent events.
+11. Replace mock events with real Wall-E agent events. Done with an ADK runner-backed stream.
+12. Move tool calls, terminal output, diffs, and errors into dedicated activity panels.
 
 ## Open Decisions
 

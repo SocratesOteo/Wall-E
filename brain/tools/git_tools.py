@@ -7,8 +7,6 @@ import os
 from pathlib import Path
 from brain.tools.shell_tools import run_command
 
-PROJECT_ROOT = Path(os.environ.get("WALL_E_PROJECT_ROOT", os.getcwd()))
-
 
 def git_status() -> dict:
     """Get the current git status of the repository.

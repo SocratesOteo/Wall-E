@@ -1,8 +1,4 @@
-"""Local HTTP API for the Wall-E brain.
-
-This module intentionally starts with a small mock event stream. The desktop app
-can integrate against this stable API before real ADK execution is attached.
-"""
+"""Local HTTP API for the Wall-E brain."""
 
 from __future__ import annotations
 
@@ -10,7 +6,7 @@ import asyncio
 import json
 import os
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -18,13 +14,22 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
 from pydantic import BaseModel, Field
+
+from brain.agent import create_wall_e_agent
+from brain.project_context import reset_project_root, set_project_root
 
 load_dotenv()
 
+APP_NAME = "wall-e"
+USER_ID = "desktop"
 DEFAULT_MODEL = os.environ.get("WALL_E_MODEL", "openrouter/qwen/qwen3-coder")
 DEFAULT_PROVIDER = os.environ.get("WALL_E_PROVIDER", DEFAULT_MODEL.split("/", 1)[0])
 DEFAULT_API_BASE = os.environ.get("WALL_E_API_BASE")
+STREAM_DONE = "__wall_e_stream_done__"
 
 
 def utc_now() -> str:
@@ -40,6 +45,7 @@ class Session:
     api_base: str | None
     created_at: str
     events: list[dict[str, Any]] = field(default_factory=list)
+    active_message_id: str | None = None
 
 
 class CreateSessionRequest(BaseModel):
@@ -70,6 +76,9 @@ app.add_middleware(
 )
 
 sessions: dict[str, Session] = {}
+runners: dict[str, Runner] = {}
+event_queues: dict[str, asyncio.Queue[dict[str, Any]]] = {}
+active_tasks: dict[str, asyncio.Task[None]] = {}
 
 
 @app.get("/health")
@@ -81,8 +90,20 @@ def health() -> dict[str, str]:
     }
 
 
+def public_session(session: Session) -> dict[str, Any]:
+    return {
+        "id": session.id,
+        "project_path": session.project_path,
+        "provider": session.provider,
+        "model": session.model,
+        "api_base": session.api_base,
+        "created_at": session.created_at,
+        "events": [],
+    }
+
+
 @app.post("/sessions")
-def create_session(request: CreateSessionRequest) -> dict[str, Any]:
+async def create_session(request: CreateSessionRequest) -> dict[str, Any]:
     session = Session(
         id=str(uuid.uuid4()),
         project_path=request.project_path,
@@ -91,13 +112,31 @@ def create_session(request: CreateSessionRequest) -> dict[str, Any]:
         api_base=request.api_base or DEFAULT_API_BASE,
         created_at=utc_now(),
     )
+    session_service = InMemorySessionService()
+    await session_service.create_session(
+        app_name=APP_NAME,
+        user_id=USER_ID,
+        session_id=session.id,
+        state={
+            "project_path": session.project_path,
+            "provider": session.provider,
+            "model": session.model,
+            "api_base": session.api_base,
+        },
+    )
+    runners[session.id] = Runner(
+        app_name=APP_NAME,
+        agent=create_wall_e_agent(session.model),
+        session_service=session_service,
+    )
+    event_queues[session.id] = asyncio.Queue()
     sessions[session.id] = session
-    return asdict(session) | {"events": []}
+    return public_session(session)
 
 
 @app.get("/sessions")
 def list_sessions() -> list[dict[str, Any]]:
-    return [asdict(session) | {"events": []} for session in sessions.values()]
+    return [public_session(session) for session in sessions.values()]
 
 
 @app.get("/sessions/{session_id}")
@@ -105,17 +144,24 @@ def get_session(session_id: str) -> dict[str, Any]:
     session = sessions.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    return asdict(session) | {"events": []}
+    return public_session(session)
 
 
 @app.post("/sessions/{session_id}/messages")
-def add_message(session_id: str, request: MessageRequest) -> dict[str, Any]:
+async def add_message(session_id: str, request: MessageRequest) -> dict[str, Any]:
     session = sessions.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if session_id not in runners:
+        raise HTTPException(status_code=500, detail="Session runner not found")
+
+    active_task = active_tasks.get(session_id)
+    if active_task and not active_task.done():
+        raise HTTPException(status_code=409, detail="Wall-E is already working on this session")
 
     message_id = str(uuid.uuid4())
-    session.events.extend(mock_response_events(session, message_id, request))
+    session.active_message_id = message_id
+    active_tasks[session_id] = asyncio.create_task(run_agent_message(session, message_id, request))
     return {
         "session_id": session.id,
         "message_id": message_id,
@@ -128,12 +174,16 @@ async def stream_events(session_id: str) -> StreamingResponse:
     session = sessions.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    queue = event_queues.get(session_id)
+    if not queue:
+        raise HTTPException(status_code=500, detail="Session event queue not found")
 
     async def generate():
-        while session.events:
-            event = session.events.pop(0)
+        while True:
+            event = await queue.get()
+            if event.get("type") == STREAM_DONE:
+                break
             yield json.dumps(event) + "\n"
-            await asyncio.sleep(0.08)
 
     return StreamingResponse(generate(), media_type="application/x-ndjson")
 
@@ -147,52 +197,143 @@ def resolve_approval(approval_id: str, request: ApprovalRequest) -> dict[str, An
     }
 
 
-def mock_response_events(
+async def run_agent_message(
     session: Session,
     message_id: str,
     request: MessageRequest,
+) -> None:
+    queue = event_queues[session.id]
+    runner = runners[session.id]
+    project_token = set_project_root(session.project_path)
+    emitted_error = False
+
+    try:
+        await emit_event(
+            session,
+            message_id,
+            "status",
+            content=f"Running {session.model}",
+        )
+        message = types.Content(
+            role="user",
+            parts=[types.Part.from_text(text=request.content.strip())],
+        )
+
+        async for adk_event in runner.run_async(
+            user_id=USER_ID,
+            session_id=session.id,
+            new_message=message,
+        ):
+            for event in events_from_adk_event(session, message_id, adk_event):
+                emitted_error = emitted_error or event.get("type") == "error"
+                await queue.put(event)
+
+        await emit_event(session, message_id, "assistant_done", content="")
+    except Exception as error:
+        if not emitted_error:
+            await emit_event(
+                session,
+                message_id,
+                "error",
+                content=str(error),
+            )
+    finally:
+        reset_project_root(project_token)
+        session.active_message_id = None
+        await queue.put(
+            {
+                "type": STREAM_DONE,
+                "session_id": session.id,
+                "message_id": message_id,
+                "timestamp": utc_now(),
+            }
+        )
+
+
+async def emit_event(
+    session: Session,
+    message_id: str,
+    event_type: str,
+    content: str = "",
+    **extra: Any,
+) -> None:
+    event = {
+        "type": event_type,
+        "session_id": session.id,
+        "message_id": message_id,
+        "timestamp": utc_now(),
+        "content": content,
+    } | extra
+    await event_queues[session.id].put(event)
+
+
+def events_from_adk_event(
+    session: Session,
+    message_id: str,
+    adk_event: Any,
 ) -> list[dict[str, Any]]:
-    prompt = request.content.strip()
-    words = [
-        "I",
-        "received",
-        "that",
-        "task.",
-        "Next",
-        "I",
-        "will",
-        "inspect",
-        "the",
-        "project,",
-        "plan",
-        "the",
-        "change,",
-        "and",
-        "stream",
-        "real",
-        "tool",
-        "events",
-        "here.",
-    ]
-
-    if "test" in prompt.lower():
-        words.extend(["Test", "execution", "will", "appear", "as", "terminal", "events."])
-
     base = {
         "session_id": session.id,
         "message_id": message_id,
         "timestamp": utc_now(),
     }
-    events = [
-        base
-        | {
-            "type": "status",
-            "content": f"Queued task for {session.model}",
-        }
-    ]
-    events.extend(base | {"type": "assistant_delta", "content": f"{word} "} for word in words)
-    events.append(base | {"type": "assistant_done", "content": ""})
+    events: list[dict[str, Any]] = []
+
+    for call in adk_event.get_function_calls() or []:
+        events.append(
+            base
+            | {
+                "type": "tool_call_started",
+                "tool_call_id": getattr(call, "id", None),
+                "tool_name": getattr(call, "name", "tool"),
+                "args": json_safe(getattr(call, "args", {})),
+                "content": getattr(call, "name", "tool"),
+            }
+        )
+
+    for response in adk_event.get_function_responses() or []:
+        events.append(
+            base
+            | {
+                "type": "tool_call_finished",
+                "tool_call_id": getattr(response, "id", None),
+                "tool_name": getattr(response, "name", "tool"),
+                "result": json_safe(getattr(response, "response", {})),
+                "content": getattr(response, "name", "tool"),
+            }
+        )
+
+    text = text_from_adk_event(adk_event)
+    if text:
+        events.append(base | {"type": "assistant_delta", "content": text})
+
+    if getattr(adk_event, "error_message", None):
+        events.append(base | {"type": "error", "content": adk_event.error_message})
+
     return events
+
+
+def text_from_adk_event(adk_event: Any) -> str:
+    content = getattr(adk_event, "content", None)
+    parts = getattr(content, "parts", None) or []
+    chunks: list[str] = []
+
+    for part in parts:
+        text = getattr(part, "text", None)
+        if text:
+            chunks.append(text)
+
+    return "".join(chunks)
+
+
+def json_safe(value: Any) -> Any:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json")
+    if isinstance(value, dict):
+        return {key: json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [json_safe(item) for item in value]
+    return value
 
 
 def main() -> None:

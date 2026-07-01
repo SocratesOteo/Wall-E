@@ -368,6 +368,21 @@ function handleBrainEvent(event, assistantMessage) {
     assistantMessage.set(event.content || "Working...");
     return;
   }
+
+  if (event.type === "tool_call_started") {
+    assistantMessage.append(`\n\nRunning ${event.toolName || "tool"}...`);
+    return;
+  }
+
+  if (event.type === "tool_call_finished") {
+    assistantMessage.append(`\nFinished ${event.toolName || "tool"}.`);
+    return;
+  }
+
+  if (event.type === "error") {
+    assistantMessage.set(event.content || "Wall-E hit an error while running the agent.");
+    return;
+  }
 }
 
 async function sendPromptToBrain(prompt) {

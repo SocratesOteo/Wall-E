@@ -9,13 +9,16 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-PROJECT_ROOT = Path(os.environ.get("WALL_E_PROJECT_ROOT", os.getcwd()))
+from brain.project_context import get_project_root
 
 
 def _resolve(path: str) -> Path:
     """Resolve a path relative to PROJECT_ROOT. Prevents directory traversal."""
-    resolved = (PROJECT_ROOT / path).resolve()
-    if not str(resolved).startswith(str(PROJECT_ROOT)):
+    project_root = get_project_root()
+    resolved = (project_root / path).resolve()
+    try:
+        resolved.relative_to(project_root)
+    except ValueError:
         raise ValueError(f"Path '{path}' escapes the project root. Blocked.")
     return resolved
 
@@ -154,7 +157,7 @@ def search_in_files(pattern: str, path: str = ".", file_glob: str = "*") -> dict
                 for i, line in enumerate(file.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
                     if regex.search(line):
                         matches.append({
-                            "file": str(file.relative_to(PROJECT_ROOT)),
+                            "file": str(file.relative_to(get_project_root())),
                             "line": i,
                             "text": line.strip(),
                         })

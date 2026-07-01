@@ -8,7 +8,8 @@ import subprocess
 import shlex
 from pathlib import Path
 
-PROJECT_ROOT = Path(os.environ.get("WALL_E_PROJECT_ROOT", os.getcwd()))
+from brain.project_context import get_project_root
+
 DEFAULT_TIMEOUT = int(os.environ.get("WALL_E_COMMAND_TIMEOUT", "60"))
 
 # Commands that require explicit user confirmation before running
@@ -42,7 +43,7 @@ def run_command(command: str, cwd: str = ".", timeout: int = DEFAULT_TIMEOUT) ->
         }
 
     try:
-        work_dir = (PROJECT_ROOT / cwd).resolve()
+        work_dir = (get_project_root() / cwd).resolve()
         result = subprocess.run(
             command,
             shell=True,
@@ -80,7 +81,7 @@ def run_tests(
     Returns:
         dict with test output and pass/fail status.
     """
-    work_dir = (PROJECT_ROOT / cwd).resolve()
+    work_dir = (get_project_root() / cwd).resolve()
 
     if framework == "auto":
         if (work_dir / "pyproject.toml").exists() or (work_dir / "setup.py").exists():
@@ -117,7 +118,7 @@ def install_packages(packages: str, manager: str = "auto", cwd: str = ".") -> di
     Returns:
         dict with install output or error.
     """
-    work_dir = (PROJECT_ROOT / cwd).resolve()
+    work_dir = (get_project_root() / cwd).resolve()
 
     if manager == "auto":
         if (work_dir / "go.mod").exists():
