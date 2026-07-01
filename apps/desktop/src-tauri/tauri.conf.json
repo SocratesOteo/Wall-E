@@ -28,6 +28,13 @@
     "active": true,
     "targets": "all",
     "category": "DeveloperTool",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "shortDescription": "Personal coding agent workspace",
     "longDescription": "Wall-E is a native personal coding agent workspace for building projects, inspecting code, running automations, and approving local agent actions."
   }

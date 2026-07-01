@@ -83,6 +83,21 @@ button {
   font-weight: 800;
 }
 
+.brand-mark,
+.message.assistant .avatar {
+  overflow: hidden;
+  background: #050608;
+  background-image: url("./assets/wall-e-face.svg");
+  background-position: center;
+  background-size: cover;
+  color: transparent;
+  font-size: 0;
+}
+
+.brand-mark {
+  border: 1px solid #000;
+}
+
 .brand strong,
 .brand span {
   display: block;
