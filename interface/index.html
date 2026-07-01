@@ -78,7 +78,7 @@
                 <option>anthropic/claude-opus-4-8</option>
               </select>
             </label>
-            <button class="icon-button" type="button" aria-label="Open settings" title="Settings">
+            <button class="icon-button" id="settingsButton" type="button" aria-label="Open settings" title="Settings">
               <span aria-hidden="true">S</span>
             </button>
           </div>
@@ -208,6 +208,55 @@
         </section>
       </aside>
     </div>
+
+    <dialog class="settings-modal" id="settingsDialog">
+      <form class="settings-card" id="settingsForm" method="dialog">
+        <header class="settings-header">
+          <div>
+            <p class="eyebrow">Provider Settings</p>
+            <h2>Model Connection</h2>
+          </div>
+          <button class="icon-button" id="closeSettingsButton" type="button" aria-label="Close settings">X</button>
+        </header>
+
+        <div class="provider-grid" role="radiogroup" aria-label="Model providers">
+          <button class="provider-option active" type="button" data-provider="ollama">
+            <strong>Ollama</strong>
+            <span>No key, local</span>
+          </button>
+          <button class="provider-option" type="button" data-provider="openrouter">
+            <strong>OpenRouter</strong>
+            <span>One key, many models</span>
+          </button>
+          <button class="provider-option" type="button" data-provider="deepseek">
+            <strong>DeepSeek</strong>
+            <span>Cheap hosted</span>
+          </button>
+          <button class="provider-option" type="button" data-provider="groq">
+            <strong>Groq</strong>
+            <span>Fast hosted</span>
+          </button>
+        </div>
+
+        <label class="settings-field">
+          <span>Model</span>
+          <input id="settingsModel" name="model" autocomplete="off" />
+        </label>
+
+        <label class="settings-field">
+          <span>Base URL</span>
+          <input id="settingsApiBase" name="apiBase" autocomplete="off" />
+        </label>
+
+        <div class="key-callout" id="settingsKeyCallout"></div>
+        <p class="settings-note" id="settingsNote"></p>
+
+        <footer class="settings-actions">
+          <button type="button" id="resetProviderButton">Use Preset</button>
+          <button class="send-button" type="submit">Save</button>
+        </footer>
+      </form>
+    </dialog>
 
     <script src="./app.js"></script>
   </body>

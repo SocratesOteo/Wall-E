@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const DEFAULT_MODEL: &str = "openrouter/qwen/qwen3-coder";
+const DEFAULT_PROVIDER: &str = "openrouter";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,6 +17,8 @@ struct AppInfo {
 #[serde(rename_all = "camelCase")]
 struct AppSettings {
     model: String,
+    provider: String,
+    api_base: Option<String>,
     project_path: Option<String>,
 }
 
@@ -23,6 +26,8 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             model: DEFAULT_MODEL.to_string(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            api_base: None,
             project_path: None,
         }
     }
@@ -83,6 +88,14 @@ fn load_settings() -> Result<AppSettings, String> {
 
 #[tauri::command]
 fn save_settings(settings: AppSettings) -> Result<AppSettings, String> {
+    if settings.provider.trim().is_empty() {
+        return Err("Provider is required.".to_string());
+    }
+
+    if settings.model.trim().is_empty() {
+        return Err("Model is required.".to_string());
+    }
+
     if let Some(project_path) = settings.project_path.as_ref() {
         let path = PathBuf::from(project_path);
         if !path.exists() {

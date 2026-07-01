@@ -516,6 +516,117 @@ textarea:focus {
   color: var(--green);
 }
 
+.settings-modal {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.settings-modal::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.settings-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.settings-header,
+.settings-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.provider-option {
+  min-height: 82px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  text-align: left;
+}
+
+.provider-option.active {
+  border-color: var(--accent);
+  background: #21313a;
+}
+
+.provider-option strong,
+.provider-option span,
+.settings-field span {
+  display: block;
+}
+
+.provider-option span,
+.settings-field span,
+.settings-note,
+.key-callout {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-field input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  outline: 0;
+  padding: 0 12px;
+}
+
+.settings-field input:focus {
+  border-color: var(--accent-strong);
+}
+
+.key-callout {
+  min-height: 36px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(99, 217, 155, 0.08);
+}
+
+.settings-note {
+  min-height: 20px;
+  margin: 0;
+}
+
+.settings-actions button:not(.send-button) {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+}
+
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 240px minmax(0, 1fr);
@@ -566,5 +677,9 @@ textarea:focus {
 
   .context-panel {
     margin-top: 16px;
+  }
+
+  .provider-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
